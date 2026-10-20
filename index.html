@@ -8,12 +8,44 @@
   :root {
     --bg: #111;
     --panel: #1b1b1b;
+    --panel-2: #242424;
+    --panel-3: #2a2a2a;
     --line: #333;
+    --line-2: #444;
     --fg: #eee;
     --muted: #999;
     --accent: #00ccff;
     --accent2: #ffcc00;
     --warn: #ff6b6b;
+    --on-accent: #00222c;
+    --active: #2b3a4a;
+    --stage: #0a0a0a;
+    --input-bg: #0d0d0d;
+    --code-fg: #cfe9ff;
+    --danger-bg: #3a2020;
+    --overlay: rgba(6, 12, 18, .72);
+    --card-bg: rgba(0, 42, 62, .6);
+  }
+  [data-theme="light"] {
+    --bg: #eef2f7;
+    --panel: #ffffff;
+    --panel-2: #eef3f9;
+    --panel-3: #e3e9f1;
+    --line: #d5dce6;
+    --line-2: #c3ccd8;
+    --fg: #1a1f26;
+    --muted: #667085;
+    --accent: #087ea4;
+    --accent2: #b26a00;
+    --warn: #b42318;
+    --on-accent: #ffffff;
+    --active: #dbeafe;
+    --stage: #dfe5ee;
+    --input-bg: #f7f9fc;
+    --code-fg: #12324a;
+    --danger-bg: #fbe4e4;
+    --overlay: rgba(238, 242, 247, .82);
+    --card-bg: rgba(255, 255, 255, .92);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -45,7 +77,7 @@
     color: var(--muted);
   }
   #imgcount { color: var(--accent); font-weight: 600; letter-spacing: 0; }
-  #progressbar { height: 4px; background: #2a2a2a; border-bottom: 1px solid var(--line); }
+  #progressbar { height: 4px; background: var(--panel-3); border-bottom: 1px solid var(--line); }
   #progressfill { height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
   #list { flex: 1; overflow: auto; }
   .item {
@@ -54,10 +86,10 @@
     gap: 8px;
     padding: 8px 12px;
     cursor: pointer;
-    border-bottom: 1px solid #222;
+    border-bottom: 1px solid var(--line);
   }
-  .item:hover { background: #242424; }
-  .item.active { background: #2b3a4a; }
+  .item:hover { background: var(--panel-2); }
+  .item.active { background: var(--active); }
   .item .idx {
     color: var(--muted);
     min-width: 30px;
@@ -80,7 +112,7 @@
   }
   .item:hover .rm,
   .item .rm:focus { opacity: 1; }
-  .item .rm:hover { color: var(--warn); background: #3a2020; }
+  .item .rm:hover { color: var(--warn); background: var(--danger-bg); }
   @media (hover: none) {
     .item .rm { opacity: 1; }
   }
@@ -109,10 +141,10 @@
     gap: 8px;
     padding: 6px 12px;
     cursor: pointer;
-    border-bottom: 1px solid #222;
+    border-bottom: 1px solid var(--line);
   }
-  .boxrow:hover { background: #242424; }
-  .boxrow.active { background: #2b3a4a; }
+  .boxrow:hover { background: var(--panel-2); }
+  .boxrow.active { background: var(--active); }
   .boxrow .sw {
     width: 10px;
     height: 10px;
@@ -135,7 +167,7 @@
   }
   .boxrow:hover .rm,
   .boxrow .rm:focus { opacity: 1; }
-  .boxrow .rm:hover { color: var(--warn); background: #3a2020; }
+  .boxrow .rm:hover { color: var(--warn); background: var(--danger-bg); }
   @media (hover: none) {
     .boxrow .rm { opacity: 1; }
   }
@@ -157,13 +189,13 @@
     font: inherit;
   }
   button:hover { filter: brightness(1.12); }
-  button.ghost { background: #333; }
+  button.ghost { background: var(--panel-3); color: var(--fg); }
   button.danger { background: #8b2e2e; }
   button:disabled { opacity: .45; cursor: default; }
   label.file {
     display: block;
     text-align: center;
-    background: #333;
+    background: var(--panel-3);
     border-radius: 4px;
     padding: 8px 10px;
     cursor: pointer;
@@ -182,14 +214,14 @@
     min-height: 46px;
     font-variant-numeric: tabular-nums;
   }
-  #modes { display: flex; background: #222; border-radius: 6px; padding: 2px; }
+  #modes { display: flex; background: var(--panel-3); border-radius: 6px; padding: 2px; }
   #modes button {
     background: transparent;
     color: var(--muted);
     padding: 5px 12px;
     border-radius: 4px;
   }
-  #modes button.active { background: var(--accent); color: #00222c; font-weight: 600; }
+  #modes button.active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
   #modes .mcount {
     margin-left: 5px;
     font-size: 11px;
@@ -215,8 +247,8 @@
   }
   #labelbar.hidden { display: none; }
   .chip {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--panel-3);
+    border: 1px solid var(--line-2);
     color: var(--fg);
     border-radius: 999px;
     padding: 3px 10px;
@@ -224,11 +256,11 @@
     font: inherit;
   }
   .chip:hover { border-color: var(--accent); }
-  .chip.active { background: var(--accent); color: #00222c; border-color: var(--accent); font-weight: 600; }
-  .chip.on { background: #2f6b4f; border-color: #46a37a; }
+  .chip.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+  .chip.on { background: #2f6b4f; border-color: #46a37a; color: #fff; }
   .chip .x { margin-left: 6px; color: var(--muted); }
   #newlabel {
-    background: #0d0d0d;
+    background: var(--input-bg);
     border: 1px solid var(--line);
     color: var(--fg);
     border-radius: 999px;
@@ -250,12 +282,12 @@
   #multitoggle input { accent-color: var(--accent); }
 
   /* canvas */
-  #stagewrap { flex: 1; position: relative; overflow: hidden; background: #0a0a0a; }
+  #stagewrap { flex: 1; position: relative; overflow: hidden; background: var(--stage); }
   #stage { display: block; }
   #drop {
     position: absolute;
     inset: 16px;
-    border: 2px dashed #3a3a3a;
+    border: 2px dashed var(--line-2);
     border-radius: 10px;
     display: flex;
     flex-direction: column;
@@ -276,7 +308,7 @@
     display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(6, 12, 18, .72);
+    background: var(--overlay);
     backdrop-filter: blur(2px);
     pointer-events: none;
   }
@@ -286,12 +318,12 @@
     border-radius: 18px;
     padding: 44px 60px;
     text-align: center;
-    background: rgba(0, 42, 62, .6);
+    background: var(--card-bg);
     box-shadow: 0 18px 50px rgba(0, 0, 0, .5);
     max-width: 80vw;
   }
   #dropveil .big { font-size: 22px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
-  #dropveil .sub { color: #cfe9ff; }
+  #dropveil .sub { color: var(--fg); }
 
   /* json panel */
   #jsonpanel {
@@ -316,8 +348,8 @@
     flex: 1;
     margin: 10px;
     padding: 10px;
-    background: #0d0d0d;
-    color: #cfe9ff;
+    background: var(--input-bg);
+    color: var(--code-fg);
     border: 1px solid var(--line);
     border-radius: 6px;
     resize: none;
@@ -334,8 +366,8 @@
     line-height: 1.5;
   }
   #hint kbd {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--panel-3);
+    border: 1px solid var(--line-2);
     border-radius: 3px;
     padding: 0 4px;
     font: inherit;
@@ -381,6 +413,7 @@
       <span id="zoomlabel">100%</span>
       <button id="zoomin" class="ghost" title="Zoom in">+</button>
       <button id="fit" class="ghost">Fit</button>
+      <button id="theme" class="ghost" title="Toggle light/dark">Light</button>
       <button id="togglejson" class="ghost">JSON</button>
     </span>
   </div>
@@ -446,6 +479,7 @@ const STORE = {
   labels: 'image-annotator:labels',
   mode: 'image-annotator:mode',
   multi: 'image-annotator:multi',
+  theme: 'image-annotator:theme',
 }
 
 /** images: [{ name, url, width, height }] */
@@ -459,6 +493,8 @@ let stores = {
 let labelSet = []
 let activeLabel = ''
 let multiLabel = false
+let theme = 'dark'
+let stageColor = '#0a0a0a'
 let mode = 'keypoints'
 let current = 0
 let selected = null // {name, index} for keypoints/boxes
@@ -490,6 +526,8 @@ function loadState() {
   if (!Array.isArray(labelSet)) labelSet = []
   activeLabel = labelSet[0] || ''
   multiLabel = localStorage.getItem(STORE.multi) === '1'
+  const savedTheme = localStorage.getItem(STORE.theme)
+  theme = savedTheme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
 
   const savedMode = localStorage.getItem(STORE.mode)
   const hashMode = location.hash.replace('#', '')
@@ -753,7 +791,7 @@ function draw() {
   const scale = view.scale
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-  ctx.fillStyle = '#0a0a0a'
+  ctx.fillStyle = stageColor
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
   ctx.setTransform(scale * dpr, 0, 0, scale * dpr, view.tx * dpr, view.ty * dpr)
@@ -1080,8 +1118,18 @@ function removeImage(index) {
 
 /* ------------------------------------------------------ mode chrome */
 
-function applyModeChrome() {
-  for (const btn of document.querySelectorAll('#modes button')) {
+function applyTheme(next, persist = true) {
+  theme = next
+  document.documentElement.dataset.theme = theme
+  if (persist) localStorage.setItem(STORE.theme, theme)
+  stageColor = getComputedStyle(document.documentElement)
+    .getPropertyValue('--stage').trim() || '#0a0a0a'
+  const btn = $('theme')
+  if (btn) btn.textContent = theme === 'light' ? 'Dark' : 'Light'
+  draw()
+}
+
+function applyModeChrome() {  for (const btn of document.querySelectorAll('#modes button')) {
     btn.classList.toggle('active', btn.dataset.mode === mode)
   }
   $('labelbar').classList.toggle('hidden', mode === 'keypoints')
@@ -1799,6 +1847,14 @@ function init() {
   const canvas = $('stage')
   initCanvas()
   initKeyboard()
+
+  applyTheme(theme, false)
+  $('theme').onclick = () => applyTheme(theme === 'light' ? 'dark' : 'light')
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', (ev) => {
+    if (!localStorage.getItem(STORE.theme)) {
+      applyTheme(ev.matches ? 'light' : 'dark', false)
+    }
+  })
 
   for (const btn of document.querySelectorAll('#modes button')) {
     btn.onclick = () => setMode(btn.dataset.mode)

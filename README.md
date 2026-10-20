@@ -17,6 +17,9 @@ A simple **single-file HTML web app** — no build step, no dependencies — for
 - **Segmented control** — in the top bar; the mode is remembered across reloads and mirrored in the URL (`#keypoints`, `#boxes`, `#classes`) for deep links
 - **Per-mode counts in the tabs** — `Keypoints (3)` is how many keypoints the **current image** has; `Boxes (2)` and `Classes (1)` show its boxes and labels, so you can see everything that image has at a glance. Dataset progress stays in the sidebar (`Images (i/n)`)
 
+### Appearance
+- **Light & dark** — follows your system/browser preference by default; the **Light/Dark** button in the top bar overrides it and the choice is remembered
+
 ### Labels
 - **Shared label set** — define labels once; use them for boxes and whole-image classes
 - **Per-box labels** — every box carries its own class, so two boxes on one image can be different things
@@ -131,7 +134,7 @@ The JSON panel always shows the **current mode**. Keys are filenames.
 
 ## Notes
 
-- Annotations live in this browser's `localStorage`, one key per mode: `keypoint-annotator-v1` (kept from the original keypoint-only version), `image-annotator:boxes`, `image-annotator:classes`, plus `image-annotator:labels`, `image-annotator:mode` and `image-annotator:multi`.
+- Annotations live in this browser's `localStorage`, one key per mode: `keypoint-annotator-v1` (kept from the original keypoint-only version), `image-annotator:boxes`, `image-annotator:classes`, plus `image-annotator:labels`, `image-annotator:mode`, `image-annotator:multi` and `image-annotator:theme`.
 - Clearing site data clears annotations — download the JSON to keep a copy.
 - Images are not persisted (browser security); only annotations are. Re-drop the same files and they reappear by filename.
 - Same-filename images in different folders share a key, so keep filenames unique when annotating across folders.
