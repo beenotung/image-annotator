@@ -700,6 +700,8 @@ let gestureKind = 'gesture'
 let gestureOnVideo = false
 /** 'video' while the slider owns the stage, 'item' once a dataset frame is selected */
 let annotateTarget = 'item'
+/** name of the kept frame under the playhead, so the preview can show its marks */
+let previewName = null
 let view = { scale: 1, tx: 0, ty: 0 }
 let pendingFit = true
 let currentImage = null
@@ -1358,7 +1360,7 @@ function renderVideoTicks() {
   }
   marks.sort((a, b) => a.t - b.t)
 
-  const currentName = images[current]?.name
+  const currentName = previewing ? previewName : images[current] && images[current].name
   for (const mark of marks) {
     const tick = document.createElement('button')
     tick.className = 'vtick' + (mark.name === currentName ? ' current' : '')
@@ -1480,6 +1482,16 @@ function updatePreview() {
   }
   previewCanvas.getContext('2d').drawImage(el, 0, 0)
 
+  // does this exact frame already exist in the dataset?
+  const key = videoKey(video)
+  const at = el.currentTime
+  const tolerance = video.fps ? 0.5 / video.fps : 0.02
+  const kept = images.find((image) => {
+    const source = sources[image.name]
+    return source && source.videoKey === key && Math.abs(source.t - at) <= tolerance
+  })
+  previewName = kept ? kept.name : null
+
   annotateTarget = 'video'
   const wasPreviewing = previewing
   previewing = true
@@ -1495,7 +1507,9 @@ function updatePreview() {
 
   $('drop').style.display = 'none'
   $('title').textContent = `Preview · ${video.name} · ${clock(el.currentTime)}`
-  $('count').textContent = 'press M, click, or start drawing to keep this frame'
+  $('count').textContent = previewName
+    ? `already kept · ${countFor(previewName)} ${unitLabel(mode, countFor(previewName))} — click to edit`
+    : 'press M, click, or start drawing to keep this frame'
   updateVideoTime()
   if (!wasPreviewing) updateList()
 }
@@ -1997,22 +2011,23 @@ function draw() {
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(currentImage, 0, 0)
 
-  if (!previewing) {
-    if (mode === 'keypoints') drawKeypoints(ctx, scale)
-    else if (mode === 'boxes') drawBoxes(ctx, scale, dpr)
-    else drawClasses(ctx, scale)
+  // show the existing annotation even while previewing a frame that was already kept
+  const name = previewing ? previewName : images[current] && images[current].name
+  if (name) {
+    if (mode === 'keypoints') drawKeypoints(ctx, scale, name)
+    else if (mode === 'boxes') drawBoxes(ctx, scale, dpr, name)
+    else drawClasses(ctx, scale, name)
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 }
 
-function drawKeypoints(ctx, scale) {
-  const image = images[current]
+function drawKeypoints(ctx, scale, name) {
   const dotR = 7 / scale
   const fontSize = 13 / scale
 
-  for (const [index, point] of pointsFor(image.name).entries()) {
-    const isSelected = selected && selected.name === image.name && selected.index === index
+  for (const [index, point] of pointsFor(name).entries()) {
+    const isSelected = selected && selected.name === name && selected.index === index
     ctx.beginPath()
     ctx.arc(point.x, point.y, dotR, 0, Math.PI * 2)
     ctx.fillStyle = isSelected ? '#ffcc00' : 'rgba(0, 204, 255, .9)'
@@ -2036,15 +2051,14 @@ function drawKeypoints(ctx, scale) {
   }
 }
 
-function drawBoxes(ctx, scale, dpr) {
-  const image = images[current]
-  const list = pointsFor(image.name)
+function drawBoxes(ctx, scale, dpr, name) {
+  const list = pointsFor(name)
   const lineW = 2 / scale
   const handleR = 4 / scale
 
   // draw the selected box last so its outline/handles stay on top
   const order = list.map((_, index) => index)
-  if (selected && selected.name === image.name) {
+  if (selected && selected.name === name) {
     const at = order.indexOf(selected.index)
     if (at !== -1) {
       order.splice(at, 1)
@@ -2054,7 +2068,7 @@ function drawBoxes(ctx, scale, dpr) {
 
   for (const index of order) {
     const box = list[index]
-    const isSelected = selected && selected.name === image.name && selected.index === index
+    const isSelected = selected && selected.name === name && selected.index === index
     if (isSelected) {
       ctx.fillStyle = 'rgba(255, 204, 0, .10)'
       ctx.fillRect(box.x, box.y, box.w, box.h)
@@ -2091,9 +2105,8 @@ function drawBoxes(ctx, scale, dpr) {
   }
 }
 
-function drawClasses(ctx, scale) {
-  const image = images[current]
-  const entry = classEntry(image.name)
+function drawClasses(ctx, scale, name) {
+  const entry = classEntry(name)
   if (!entry.labels.length) return
 
   const fontSize = 15 / scale
@@ -2780,8 +2793,9 @@ function initCanvas() {
       const isClick = travelled < 8
 
       if (isClick && gestureOnVideo) {
-        // clicking the video keeps the frame; in keypoints mode the click is also the first point
-        if (mode === 'keypoints') keepFrameThen(() => addPointAt(ev.clientX, ev.clientY))
+        // a click keeps a new frame (and in keypoints mode drops the first point);
+        // on a frame that already exists it simply opens it for editing
+        if (mode === 'keypoints' && !previewName) keepFrameThen(() => addPointAt(ev.clientX, ev.clientY))
         else markFrame()
         return
       }
