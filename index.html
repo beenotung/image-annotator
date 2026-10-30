@@ -1522,6 +1522,38 @@ function pumpSeek() {
   })
 }
 
+/** repaint the stage from the video element, cheap enough to run every frame */
+function paintPreviewFrame() {
+  const el = $('vpreview')
+  if (!previewing || !previewCanvas || !el.videoWidth) return
+  if (previewCanvas.width !== el.videoWidth || previewCanvas.height !== el.videoHeight) {
+    previewCanvas.width = el.videoWidth
+    previewCanvas.height = el.videoHeight
+  }
+  previewCanvas.getContext('2d').drawImage(el, 0, 0)
+  updateVideoTime()
+  syncSlider()
+  draw()
+}
+
+let playbackFrame = 0
+
+function playbackLoop() {
+  playbackFrame = 0
+  const el = $('vpreview')
+  if (!videos.length || el.paused) {
+    updatePreview() // settle: recompute "already kept" and the hints
+    return
+  }
+  paintPreviewFrame()
+  playbackFrame = requestAnimationFrame(playbackLoop)
+}
+
+function startPlaybackLoop() {
+  if (playbackFrame) return
+  playbackFrame = requestAnimationFrame(playbackLoop)
+}
+
 /** Mirror the frame under the slider onto the big stage (read-only preview). */
 function updatePreview() {
   const video = videos[activeVideo]
@@ -3603,8 +3635,19 @@ function init() {
     }
     if (previewArmed) updatePreview()
   })
-  preview.addEventListener('play', updateVideoTime)
-  preview.addEventListener('pause', updateVideoTime)
+  preview.addEventListener('play', () => {
+    updateVideoTime()
+    if (!videos.length) return
+    previewArmed = true
+    annotateTarget = 'video'
+    updatePreview()
+    startPlaybackLoop()
+  })
+  preview.addEventListener('pause', () => {
+    updateVideoTime()
+    if (!videos.length) return
+    updatePreview()
+  })
   preview.addEventListener('error', () => {
     if (videos.length) flash('This browser cannot play that video')
   })
