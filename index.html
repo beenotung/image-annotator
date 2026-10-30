@@ -631,6 +631,7 @@
     <kbd>F</kbd> fit ·
     <kbd>Esc</kbd> deselect ·
     <kbd>U</kbd> / <kbd>⌘Z</kbd> undo · <kbd>R</kbd> / <kbd>⇧⌘Z</kbd> redo<br>
+    <kbd>↑</kbd> <kbd>↓</kbd> previous / next image ·
     Video: <kbd>←</kbd> <kbd>→</kbd> jump (size in the picker, <kbd>Shift</kbd> ×10) ·
     <kbd>M</kbd> or <b>click the picture</b> to keep that frame · <kbd>Space</kbd> play/pause<br>
     Arrows nudge the selected point instead — <kbd>Esc</kbd> first to jump again<br>
@@ -704,6 +705,8 @@ let annotateTarget = 'item'
 let previewName = null
 let view = { scale: 1, tx: 0, ty: 0 }
 let pendingFit = true
+/** size the current zoom was fitted to — the view is only re-fitted when it changes */
+let fittedSize = null
 let currentImage = null
 let renderToken = 0
 /** true while the stage shows a live video frame instead of a dataset item */
@@ -1347,6 +1350,21 @@ function removeVideo(index, { record = true } = {}) {
   selectVideo(activeVideo)
 }
 
+/** step through the dataset list, keeping the video playhead in step */
+function moveSelection(delta) {
+  if (!images.length) return
+  const next = clamp(current + delta, 0, images.length - 1)
+  if (next === current && !previewing) return
+  current = next
+  selected = null
+  pendingFit = true
+  render()
+  updateList()
+  syncVideoToFrame(images[next].name)
+  const row = document.querySelector('.item.active')
+  if (row) row.scrollIntoView({ block: 'nearest' })
+}
+
 /** move the video playhead (and the slider) onto a kept frame, without previewing it */
 async function syncVideoToFrame(name) {
   const source = sources[name]
@@ -1515,12 +1533,7 @@ function updatePreview() {
   currentImage = previewCanvas
   pendingFit = false
 
-  if (!wasPreviewing) {
-    resizeCanvas()
-    fitView()
-  } else {
-    draw()
-  }
+  maybeFit()
 
   $('drop').style.display = 'none'
   $('title').textContent = `Preview · ${video.name} · ${clock(el.currentTime)}`
@@ -1974,7 +1987,28 @@ function fitView() {
   view.scale = scale
   view.tx = (wrap.clientWidth - size.w * scale) / 2
   view.ty = (wrap.clientHeight - size.h * scale) / 2
+  fittedSize = { w: size.w, h: size.h }
   applyView()
+}
+
+/** fit only when the picture's size changed, so zoom and pan survive seeking */
+function ensureCanvasSize() {
+  const wrap = $('stagewrap')
+  const canvas = $('stage')
+  if (canvas.style.width !== wrap.clientWidth + 'px' || canvas.style.height !== wrap.clientHeight + 'px') {
+    resizeCanvas()
+  }
+}
+
+function maybeFit() {
+  ensureCanvasSize()
+  const size = imageSize()
+  if (!size.w || !size.h) return
+  if (!fittedSize || fittedSize.w !== size.w || fittedSize.h !== size.h) {
+    fitView()
+  } else {
+    draw()
+  }
 }
 
 function zoomAt(clientX, clientY, factor) {
@@ -2155,12 +2189,8 @@ async function render() {
   currentImage = img
 
   resizeCanvas()
-  if (pendingFit) {
-    pendingFit = false
-    fitView()
-  } else {
-    draw()
-  }
+  pendingFit = false
+  maybeFit()
 
   $('title').textContent = image.name
   updateCountLabel()
@@ -3013,6 +3043,18 @@ function initKeyboard() {
           stepFrame(ev.key === 'ArrowRight' ? 1 : -1, ev.shiftKey ? 10 : 1)
           return
         }
+      }
+    }
+
+    // up / down walk the dataset list, unless a point is selected (then they nudge)
+    if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+      const nudgeHere = !previewing && selected &&
+        selected.name === images[current]?.name && mode !== 'classes' &&
+        !(mode === 'boxes' && freshBox)
+      if (!nudgeHere) {
+        ev.preventDefault()
+        moveSelection(ev.key === 'ArrowDown' ? 1 : -1)
+        return
       }
     }
 
