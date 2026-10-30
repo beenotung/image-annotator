@@ -526,13 +526,13 @@
   </div>
   <div class="foot">
     <label class="file">Add images / ZIP…
-      <input id="picker" type="file" accept="image/*" multiple>
+      <input id="picker" type="file" accept="image/*,.zip,application/zip" multiple>
     </label>
     <label class="file">Add video…
       <input id="videopicker" type="file" accept="video/*" multiple>
     </label>
     <label class="file">Add folder…
-      <input id="folder" type="file" accept="image/*,video/*,.json,application/json" webkitdirectory multiple>
+      <input id="folder" type="file" accept="image/*,video/*,.zip,.json,application/json,application/zip" webkitdirectory multiple>
     </label>
     <button id="importfile" class="ghost">Import annotations JSON…</button>
     <input id="jsonfile" type="file" accept=".json,application/json" hidden>
@@ -615,6 +615,7 @@
   <div id="jsonactions">
     <button id="copy">Copy</button>
     <button id="download" class="ghost">Download JSON</button>
+    <button id="downloadzip" class="ghost" title="Annotated images + all three JSON files">Download ZIP</button>
     <button id="import" class="ghost">Import from box</button>
     <button id="importfile2" class="ghost">Import file…</button>
     <button id="selectall" class="ghost">Select all</button>
@@ -630,7 +631,8 @@
     Arrows nudge the selected point instead — <kbd>Esc</kbd> first to jump again<br>
     Click again to cycle overlapping boxes · <kbd>Alt</kbd>-click to cycle<br>
     Saved in this browser (localStorage), keyed by filename.<br>
-    <b>Tip:</b> drop images, a video, a folder or an annotations <code>.json</code> anywhere.
+    <b>Tip:</b> drop images, a video, a ZIP (e.g. from the frame extractor) or an annotations <code>.json</code> anywhere.<br>
+    <b>Export:</b> <code>Download ZIP</code> carries the annotated images plus all three annotation files.
   </div>
 </div>
 
@@ -638,7 +640,7 @@
 
 <div id="dropveil">
   <div class="card">
-    <div class="big">Drop images, a video, a folder, or an annotations .json</div>
+    <div class="big">Drop images, a video, a ZIP, a folder, or an annotations .json</div>
     <div class="sub">Release anywhere on this page. A folder is scanned recursively; a ZIP from the video frame extractor is read as images; a .json imports its annotations. The browser will not open the file.</div>
   </div>
 </div>
@@ -892,6 +894,10 @@ async function addFiles(fileList) {
 
   for (const file of files) {
     const lower = file.name.toLowerCase()
+    if (lower.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+      await importZip(file)
+      continue
+    }
     if (file.type.startsWith('video/') || /\.(mp4|m4v|mov|webm|ogv|mkv|avi)$/.test(lower)) {
       await addVideo(file)
       continue
@@ -1550,6 +1556,129 @@ function pushBox(rect) {
   updateCountLabel()
   renderLabelChips()
   draw()
+}
+
+/* ------------------------------------------------------------ zip reader */
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream !== 'function') {
+    throw new Error('This browser cannot unzip (DecompressionStream is missing)')
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
+/** Minimal ZIP reader: central directory + stored/deflate entries. No ZIP64, no encryption. */
+async function readZip(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const view = new DataView(bytes.buffer)
+
+  let eocd = -1
+  const floor = Math.max(0, bytes.length - 66000)
+  for (let i = bytes.length - 22; i >= floor; i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocd = i
+      break
+    }
+  }
+  if (eocd < 0) throw new Error('Not a ZIP file (no end-of-central-directory record)')
+
+  const count = view.getUint16(eocd + 10, true)
+  const directoryOffset = view.getUint32(eocd + 16, true)
+  if (count === 0xffff || directoryOffset === 0xffffffff) throw new Error('ZIP64 is not supported')
+
+  const decoder = new TextDecoder('utf-8')
+  const entries = []
+  let pointer = directoryOffset
+
+  for (let i = 0; i < count; i++) {
+    if (view.getUint32(pointer, true) !== 0x02014b50) break
+    const flags = view.getUint16(pointer + 8, true)
+    const method = view.getUint16(pointer + 10, true)
+    const compressedSize = view.getUint32(pointer + 20, true)
+    const nameLength = view.getUint16(pointer + 28, true)
+    const extraLength = view.getUint16(pointer + 30, true)
+    const commentLength = view.getUint16(pointer + 32, true)
+    const localOffset = view.getUint32(pointer + 42, true)
+    const name = decoder.decode(bytes.subarray(pointer + 46, pointer + 46 + nameLength))
+    pointer += 46 + nameLength + extraLength + commentLength
+
+    if (flags & 1) throw new Error('Encrypted ZIP is not supported')
+    if (name.endsWith('/')) continue
+    if (view.getUint32(localOffset, true) !== 0x04034b50) continue
+
+    const localNameLength = view.getUint16(localOffset + 26, true)
+    const localExtraLength = view.getUint16(localOffset + 28, true)
+    const start = localOffset + 30 + localNameLength + localExtraLength
+    const raw = bytes.subarray(start, start + compressedSize)
+
+    let data
+    if (method === 0) data = raw
+    else if (method === 8) data = await inflateRaw(raw)
+    else throw new Error(`Unsupported ZIP compression method ${method}`)
+
+    entries.push({ name, bytes: data })
+  }
+
+  return entries
+}
+
+async function importZip(file) {
+  let entries
+  try {
+    entries = await readZip(file)
+  } catch (error) {
+    flash(error.message || 'Cannot read that ZIP')
+    return
+  }
+
+  const imagesFromZip = []
+  const note = { images: 0, annotations: 0, skipped: 0 }
+
+  for (const entry of entries) {
+    const base = entry.name.split('/').pop() || ''
+    if (!base || base.startsWith('.')) continue
+    if (entry.name.startsWith('__MACOSX/')) continue
+
+    if (/\.json$/i.test(base)) {
+      let data
+      try {
+        data = JSON.parse(new TextDecoder().decode(entry.bytes))
+      } catch {
+        note.skipped++
+        continue
+      }
+      const forMode = data?._meta?.mode
+      if (MODES.includes(forMode)) {
+        await importJsonText(JSON.stringify(data), forMode)
+        note.annotations++
+      } else {
+        note.skipped++
+      }
+      continue
+    }
+
+    if (!IMAGE_MIME[(base.split('.').pop() || '').toLowerCase()]) {
+      note.skipped++
+      continue
+    }
+
+    imagesFromZip.push(new File([entry.bytes], base, { type: mimeFor(base) }))
+  }
+
+  if (!imagesFromZip.length && !note.annotations) {
+    flash('No images or annotations found in that ZIP')
+    return
+  }
+
+  imagesFromZip.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  if (imagesFromZip.length) await addFiles(imagesFromZip)
+
+  const parts = []
+  if (imagesFromZip.length) parts.push(`${imagesFromZip.length} image${imagesFromZip.length === 1 ? '' : 's'}`)
+  if (note.annotations) parts.push(`${note.annotations} annotation file${note.annotations === 1 ? '' : 's'}`)
+  if (note.skipped) parts.push(`${note.skipped} skipped`)
+  flash(`ZIP: ${parts.join(', ')}`)
 }
 
 /* -------------------------------------------------------------- drawing */
@@ -2728,6 +2857,233 @@ function downloadJson() {
   URL.revokeObjectURL(a.href)
 }
 
+/* ---------------------------------------------------------- zip writer */
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    let c = i
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    table[i] = c >>> 0
+  }
+  return table
+})()
+
+function crc32(bytes) {
+  let c = 0xffffffff
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
+  return (c ^ 0xffffffff) >>> 0
+}
+
+/** Store-only ZIP: the payloads are JPEG/PNG, so compression would only cost code. */
+function makeZip(files) {
+  const encoder = new TextEncoder()
+  const chunks = []
+  const central = []
+  let offset = 0
+
+  for (const file of files) {
+    const name = encoder.encode(file.name)
+    const data = file.bytes
+    const crc = crc32(data)
+
+    const local = new Uint8Array(30 + name.length)
+    const lv = new DataView(local.buffer)
+    lv.setUint32(0, 0x04034b50, true)
+    lv.setUint16(4, 20, true)
+    lv.setUint16(6, 0x0800, true) // UTF-8 names
+    lv.setUint16(8, 0, true)      // stored
+    lv.setUint32(14, crc, true)
+    lv.setUint32(18, data.length, true)
+    lv.setUint32(22, data.length, true)
+    lv.setUint16(26, name.length, true)
+    local.set(name, 30)
+
+    const entry = new Uint8Array(46 + name.length)
+    const cv = new DataView(entry.buffer)
+    cv.setUint32(0, 0x02014b50, true)
+    cv.setUint16(4, 20, true)
+    cv.setUint16(6, 20, true)
+    cv.setUint16(8, 0x0800, true)
+    cv.setUint16(10, 0, true)
+    cv.setUint32(16, crc, true)
+    cv.setUint32(20, data.length, true)
+    cv.setUint32(24, data.length, true)
+    cv.setUint16(28, name.length, true)
+    cv.setUint32(42, offset, true)
+    entry.set(name, 46)
+
+    chunks.push(local, data)
+    central.push(entry)
+    offset += local.length + data.length
+  }
+
+  let directorySize = 0
+  for (const entry of central) directorySize += entry.length
+
+  const end = new Uint8Array(22)
+  const ev = new DataView(end.buffer)
+  ev.setUint32(0, 0x06054b50, true)
+  ev.setUint16(8, central.length, true)
+  ev.setUint16(10, central.length, true)
+  ev.setUint32(12, directorySize, true)
+  ev.setUint32(16, offset, true)
+
+  return new Blob([...chunks, ...central, end], { type: 'application/zip' })
+}
+
+function annotatedNames() {
+  const names = new Set()
+  for (const forMode of MODES) {
+    for (const [name, value] of Object.entries(stores[forMode])) {
+      const count = forMode === 'classes'
+        ? (value && Array.isArray(value.labels) ? value.labels.length : 0)
+        : (Array.isArray(value) ? value.length : 0)
+      if (count > 0) names.add(name)
+    }
+  }
+  return [...names]
+}
+
+async function downloadZip() {
+  const names = annotatedNames()
+  if (!names.length) {
+    flash('Nothing annotated yet')
+    return
+  }
+
+  const encoder = new TextEncoder()
+  const files = []
+  const missing = []
+
+  for (const name of names) {
+    const image = images.find((item) => item.name === name)
+    if (!image || !image.blob) {
+      missing.push(name)
+      continue
+    }
+    files.push({ name, bytes: new Uint8Array(await image.blob.arrayBuffer()) })
+  }
+
+  for (const forMode of MODES) {
+    const data = exportObject(forMode)
+    if (Object.keys(data).length <= 1) continue
+    files.push({
+      name: `annotations-${forMode}.json`,
+      bytes: encoder.encode(JSON.stringify(data, null, 2)),
+    })
+  }
+
+  const manifest = {
+    tool: 'image-annotator',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    coord: 'source-pixels',
+    modes: MODES,
+    images: names.filter((name) => !missing.includes(name)),
+    sources,
+    missing,
+  }
+  files.push({ name: '_manifest.json', bytes: encoder.encode(JSON.stringify(manifest, null, 2)) })
+
+  const blob = makeZip(files)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `annotations_${names.length - missing.length}img.zip`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
+
+  flash(
+    `ZIP: ${names.length - missing.length} image${names.length - missing.length === 1 ? '' : 's'}` +
+    (missing.length ? `, ${missing.length} not loaded` : ''),
+  )
+}
+
+async function importJsonText(text, forMode = mode) {
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch {
+    flash('Invalid JSON')
+    return
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    flash('JSON must be an object keyed by filename')
+    return
+  }
+
+  if (data._sources && typeof data._sources === 'object') {
+    Object.assign(sources, data._sources)
+    saveSources()
+  }
+
+  const target = MODES.includes(forMode) ? forMode : mode
+  let imported = 0
+  if (target === 'classes') {
+    for (const [name, value] of Object.entries(data)) {
+      if (name.startsWith('_')) continue
+      const labels = (Array.isArray(value) ? value : value?.labels) || []
+      const clean = [...new Set(labels.filter((label) => typeof label === 'string' && label.trim()))]
+      if (!clean.length) continue
+      stores.classes[name] = { labels: clean }
+      imported++
+      for (const label of clean) {
+        if (!labelSet.includes(label)) labelSet.push(label)
+      }
+    }
+    saveLabels()
+    saveStore('classes')
+  } else {
+    const store = stores[target]
+    for (const [name, list] of Object.entries(data)) {
+      if (name.startsWith('_')) continue
+      if (!Array.isArray(list)) continue
+      const clean = list
+        .filter((item) => {
+          if (!item || typeof item !== 'object') return false
+          if (!Number.isFinite(Number(item.x)) || !Number.isFinite(Number(item.y))) return false
+          if (target === 'boxes') {
+            return Number.isFinite(Number(item.w)) && Number.isFinite(Number(item.h))
+          }
+          return true
+        })
+        .map((item, index) => {
+          if (target === 'boxes') {
+            return {
+              x: Number(item.x), y: Number(item.y),
+              w: Number(item.w), h: Number(item.h),
+              label: String(item.label || ''),
+            }
+          }
+          return {
+            x: Number(item.x), y: Number(item.y),
+            label: String(item.label || 'p' + (index + 1)),
+          }
+        })
+      if (!clean.length) continue
+      store[name] = clean
+      imported++
+      for (const item of clean) {
+        if (item.label && !labelSet.includes(item.label)) labelSet.push(item.label)
+      }
+    }
+    saveLabels()
+    saveStore(target)
+  }
+
+  updateList()
+  updateJson()
+  if (target === mode) {
+    updateCountLabel()
+    renderLabelChips()
+    await render()
+  }
+  flash(imported
+    ? `Imported ${imported} image${imported === 1 ? '' : 's'} (${target})`
+    : 'No valid annotations found')
+}
+
 /* ------------------------------------------------------------- wiring */
 
 function init() {
@@ -2907,6 +3263,7 @@ function init() {
   }
   $('copy').onclick = copyJson
   $('download').onclick = downloadJson
+  $('downloadzip').onclick = downloadZip
   $('import').onclick = () => importJsonText($('json').value)
   $('selectall').onclick = () => { $('json').focus(); $('json').select() }
 
