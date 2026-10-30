@@ -3165,7 +3165,22 @@ function exportObject(forMode = mode) {
 function updateJson() {
   const el = $('json')
   if (!el) return
-  el.value = JSON.stringify(exportObject(), null, 2)
+  const data = exportObject()
+  el.value = JSON.stringify(data, null, 2)
+
+  // the store is the source of truth: entries can outlive the loaded files
+  const names = Object.keys(data).filter((name) => !name.startsWith('_'))
+  const missing = names.filter((name) => !images.some((image) => image.name === name)).length
+  const head = $('jsonhead')
+  if (head) {
+    const base = mode === 'keypoints' ? 'Keypoints JSON' : mode === 'boxes' ? 'Boxes JSON' : 'Classes JSON'
+    head.textContent = names.length
+      ? `${base} — ${names.length} item${names.length === 1 ? '' : 's'}${missing ? ` (${missing} not loaded)` : ''}`
+      : base
+    head.title = missing
+      ? `${missing} entr${missing === 1 ? 'y belongs' : 'ies belong'} to images that are not in the list right now; they are kept so re-adding the file restores them`
+      : 'Every entry belongs to an image in the list'
+  }
 }
 
 async function copyJson() {
