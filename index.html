@@ -235,6 +235,7 @@
   #zoombar { display: flex; gap: 6px; align-items: center; margin-left: auto; }
   #zoombar button { padding: 4px 9px; }
   #zoomlabel { color: var(--muted); min-width: 46px; text-align: center; }
+  #histcount { font-size: 11px; font-variant-numeric: tabular-nums; min-width: 22px; }
 
   /* label bar */
   #labelbar {
@@ -555,6 +556,9 @@
       <span id="zoomlabel">100%</span>
       <button id="zoomin" class="ghost" title="Zoom in">+</button>
       <button id="fit" class="ghost">Fit</button>
+      <button id="undo" class="ghost" disabled title="Nothing to undo">↺</button>
+      <button id="redo" class="ghost" disabled title="Nothing to redo">↻</button>
+      <span id="histcount" class="muted" title="Undo steps available (redo steps shown after a dot)"></span>
       <button id="theme" class="ghost" title="Toggle light/dark">Light</button>
       <button id="togglejson" class="ghost">JSON</button>
     </span>
@@ -625,7 +629,8 @@
     <kbd>←↑↓→</kbd> nudge 1px (<kbd>Shift</kbd> 10px) ·
     <kbd>1…9</kbd> labels ·
     <kbd>F</kbd> fit ·
-    <kbd>Esc</kbd> deselect<br>
+    <kbd>Esc</kbd> deselect ·
+    <kbd>U</kbd> / <kbd>⌘Z</kbd> undo · <kbd>R</kbd> / <kbd>⇧⌘Z</kbd> redo<br>
     Video: <kbd>←</kbd> <kbd>→</kbd> jump (size in the picker, <kbd>Shift</kbd> ×10) ·
     <kbd>M</kbd> or <b>click the picture</b> to keep that frame · <kbd>Space</kbd> play/pause<br>
     Arrows nudge the selected point instead — <kbd>Esc</kbd> first to jump again<br>
@@ -689,6 +694,8 @@ let selected = null // {name, index} for keypoints/boxes
 /** a box that was just drawn/moved — arrows keep navigating until you click it */
 let freshBox = false
 /** snapshot taken on pointerdown, committed on pointerup */
+let gestureBefore = null
+let gestureKind = 'gesture'
 /** true when the gesture started on the video (preview on screen, or a scrub still landing) */
 let gestureOnVideo = false
 /** 'video' while the slider owns the stage, 'item' once a dataset frame is selected */
@@ -749,6 +756,162 @@ function saveStore(key) {
 function saveLabels() {
   localStorage.setItem(STORE.labels, JSON.stringify(labelSet))
   updateJson()
+}
+
+/* ------------------------------------------------------------- undo/redo */
+
+const UNDO_LIMIT = 200
+// "keep a frame" steps pin that frame's JPEG, so they get their own smaller cap
+const KEEP_STEP_LIMIT = 40
+let undoStack = []
+let redoStack = []
+
+function snapshotOf(forMode, name) {
+  const value = stores[forMode][name]
+  return value === undefined ? null : JSON.parse(JSON.stringify(value))
+}
+
+function sameSnapshot(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+function restoreSnapshot(forMode, name, snapshot) {
+  if (snapshot === null) delete stores[forMode][name]
+  else stores[forMode][name] = JSON.parse(JSON.stringify(snapshot))
+  saveStore(forMode)
+}
+
+/**
+ * One undo step per user action. Consecutive nudges of the same target within a
+ * second collapse into a single step, so "hold the arrow key" is one undo.
+ */
+function recordChange(forMode, name, before, after, kind = '') {
+  if (sameSnapshot(before, after)) return
+  const coalesce = kind === 'nudge' || kind === 'drag-point'
+  const last = undoStack[undoStack.length - 1]
+  if (
+    coalesce && last && last.kind === kind && last.forMode === forMode && last.name === name &&
+    Date.now() - last.at < 900
+  ) {
+    last.after = after
+    last.at = Date.now()
+  } else {
+    undoStack.push({ forMode, name, label: name, before, after, kind, at: Date.now() })
+    trimHistory()
+  }
+  redoStack = []
+  updateUndoButtons()
+}
+
+function trimHistory() {
+  while (undoStack.length > UNDO_LIMIT) undoStack.shift()
+  let keeps = undoStack.reduce((n, step) => n + (step.type === 'keep-frame' ? 1 : 0), 0)
+  while (keeps > KEEP_STEP_LIMIT) {
+    const at = undoStack.findIndex((step) => step.type === 'keep-frame')
+    if (at === -1) break
+    undoStack.splice(at, 1)
+    keeps--
+  }
+}
+
+function updateUndoButtons() {
+  const undoBtn = $('undo')
+  const redoBtn = $('redo')
+  if (undoBtn) {
+    undoBtn.disabled = !undoStack.length
+    undoBtn.title = undoStack.length ? `Undo (⌘Z) — ${undoStack.length} step${undoStack.length === 1 ? '' : 's'}` : 'Nothing to undo'
+  }
+  if (redoBtn) {
+    redoBtn.disabled = !redoStack.length
+    redoBtn.title = redoStack.length ? `Redo (⇧⌘Z) — ${redoStack.length} step${redoStack.length === 1 ? '' : 's'}` : 'Nothing to redo'
+  }
+  const badge = $('histcount')
+  if (badge) {
+    const used = undoStack.length
+    const redo = redoStack.length
+    // "used / limit", so you can see both how far you are and what is left
+    badge.textContent = used || redo ? `${used}/${UNDO_LIMIT}${redo ? ` · ${redo}` : ''}` : ''
+    badge.title = used || redo
+      ? `${used} of ${UNDO_LIMIT} undo steps (${UNDO_LIMIT - used} left)${redo ? `, ${redo} to redo` : ''}`
+      : 'No undo history yet'
+  }
+}
+
+function refreshAfterHistory(forMode) {
+  updateList()
+  updateJson()
+  if (forMode === mode && !previewing) {
+    selected = null
+    updateCountLabel()
+    renderLabelChips()
+    updateBoxList()
+    draw()
+  }
+}
+
+function reopenKeptFrame(step) {
+  const url = URL.createObjectURL(step.entry.blob)
+  const entry = {
+    name: step.entry.name, url,
+    width: step.entry.width, height: step.entry.height,
+    blob: step.entry.blob,
+  }
+  if (!images.some((image) => image.name === entry.name)) images.push(entry)
+  if (step.source) {
+    sources[entry.name] = { ...step.source }
+    saveSources()
+  }
+  const video = videos.find((item) => item && step.source && videoKey(item) === step.source.videoKey)
+  if (video && !video.marked.includes(entry.name)) video.marked.push(entry.name)
+  restoreSnapshot(step.forMode, entry.name, step.after)
+  current = images.indexOf(entry)
+  selected = null
+  pendingFit = true
+  render()
+  updateList()
+  renderVideoTabs()
+  renderVideoTicks()
+}
+
+function applyHistoryStep(step, direction) {
+  // direction 1 = undo (apply `before`), -1 = redo (apply `after`)
+  if (step.type === 'video-close') {
+    if (direction === 1) reopenVideo(step)
+    else removeVideo(step.index, { record: false })
+    return
+  }
+  if (step.type === 'keep-frame') {
+    if (direction === -1) {
+      reopenKeptFrame(step)
+      return
+    }
+    const at = images.findIndex((image) => image.name === step.entry.name)
+    if (at !== -1) removeImage(at) // also drops the timeline marker
+    restoreSnapshot(step.forMode, step.entry.name, step.before)
+    updateList()
+    updateJson()
+    return
+  }
+  restoreSnapshot(step.forMode, step.name, direction === 1 ? step.before : step.after)
+  refreshAfterHistory(step.forMode)
+}
+
+function undo() {
+  const step = undoStack.pop()
+  if (!step) return
+  applyHistoryStep(step, 1)
+  redoStack.push(step)
+  updateUndoButtons()
+  flash(`Undo${step.label ? ` · ${step.label}` : ''}`)
+}
+
+function redo() {
+  const step = redoStack.pop()
+  if (!step) return
+  applyHistoryStep(step, -1)
+  undoStack.push(step)
+  updateUndoButtons()
+  flash(`Redo${step.label ? ` · ${step.label}` : ''}`)
 }
 
 function saveSources() {
@@ -1104,11 +1267,47 @@ function renderVideoTabs() {
   })
 }
 
-function removeVideo(index) {
+/** bring back a closed video from its history step */
+async function reopenVideo(step) {
+  const saved = step.video
+  const url = URL.createObjectURL(saved.file)
+  const restored = { ...saved, url }
+  videos.splice(Math.min(step.index, videos.length), 0, restored)
+  $('videopanel').classList.remove('hidden')
+  await selectVideo(videos.indexOf(restored))
+  flash(`Reopened ${saved.name}`)
+}
+
+function removeVideo(index, { record = true } = {}) {
   const video = videos[index]
   if (!video) return
   // no confirm: closing the tab keeps every marked frame, and undo brings the video back
   const marked = video.marked.length
+
+  if (record) {
+    undoStack.push({
+      type: 'video-close',
+      index,
+      label: video.name,
+      at: Date.now(),
+      video: {
+        name: video.name,
+        size: video.size,
+        mtime: video.mtime,
+        file: video.file,
+        duration: video.duration,
+        width: video.width,
+        height: video.height,
+        fps: video.fps,
+        fpsSource: video.fpsSource,
+        time: video.time,
+        marked: [...video.marked],
+      },
+    })
+    trimHistory()
+    redoStack = []
+    updateUndoButtons()
+  }
 
   URL.revokeObjectURL(video.url)
   videos.splice(index, 1)
@@ -1514,8 +1713,24 @@ async function keepFrameThen(apply) {
   const entry = await markFrame()
   if (!entry) return
 
+  const before = snapshotOf(mode, entry.name)
   apply()
   saveStore(mode)
+
+  // one step covers both "the frame appeared" and "the box/keypoint on it"
+  undoStack.push({
+    type: 'keep-frame',
+    label: entry.name,
+    at: Date.now(),
+    entry: { name: entry.name, blob: entry.blob, width: entry.width, height: entry.height },
+    forMode: mode,
+    before,
+    after: snapshotOf(mode, entry.name),
+    source: sources[entry.name] ? { ...sources[entry.name] } : null,
+  })
+  trimHistory()
+  redoStack = []
+  updateUndoButtons()
 
   updateList()
   updateCountLabel()
@@ -1537,6 +1752,7 @@ function addPointAt(clientX, clientY) {
     y: clamp(p.y, 0, images[current].height - 1),
     label: 'p' + (list.length + 1),
   })
+  gestureKind = 'add-point'
   selected = { name, index: list.length - 1 }
   saveStore('keypoints')
   updateList()
@@ -1549,6 +1765,7 @@ function pushBox(rect) {
   const name = images[current].name
   if (!stores.boxes[name]) stores.boxes[name] = []
   stores.boxes[name].push({ ...rect, label: activeLabel })
+  gestureKind = 'draw-box'
   selected = { name, index: stores.boxes[name].length - 1 }
   freshBox = true
   saveStore('boxes')
@@ -2182,8 +2399,10 @@ function renderLabelChips() {
       chip.onclick = () => {
         activeLabel = label
         if (!previewing && selected && mode === 'boxes' && selected.name === images[current]?.name) {
+          const before = snapshotOf('boxes', selected.name)
           stores.boxes[selected.name][selected.index].label = label
           saveStore('boxes')
+          recordChange('boxes', selected.name, before, snapshotOf('boxes', selected.name), 'label')
           updateCountLabel()
         }
         renderLabelChips()
@@ -2218,6 +2437,7 @@ function toggleClass(label) {
   }
   if (!images.length) return
   const name = images[current].name
+  const before = snapshotOf('classes', name)
   const entry = classEntry(name)
   let labels
   if (multiLabel) {
@@ -2230,6 +2450,7 @@ function toggleClass(label) {
   }
   stores.classes[name] = { labels }
   saveStore('classes')
+  recordChange('classes', name, before, snapshotOf('classes', name), 'class')
   updateList()
   updateCountLabel()
   renderLabelChips()
@@ -2358,6 +2579,8 @@ function initCanvas() {
     }
 
     const name = images[current] ? images[current].name : null
+    gestureBefore = name ? { forMode: mode, name, value: snapshotOf(mode, name) } : null
+    gestureKind = 'gesture'
 
     if (mode === 'boxes') {
       // on the video there are no boxes to grab: every drag starts a new one
@@ -2535,6 +2758,17 @@ function initCanvas() {
   })
 
   canvas.addEventListener('pointerup', (ev) => {
+    // the whole gesture is one undo step; committed after this handler finishes
+    const pending = gestureBefore
+    const onVideo = gestureOnVideo
+    gestureBefore = null
+    // gestures on the video are already recorded by keepFrameThen (frame + annotation)
+    if (pending && !onVideo) {
+      setTimeout(() => {
+        recordChange(pending.forMode, pending.name, pending.value, snapshotOf(pending.forMode, pending.name), gestureKind)
+      }, 0)
+    }
+
     if (!drag) return
     const finished = drag
     drag = null
@@ -2582,6 +2816,7 @@ function initCanvas() {
     }
 
     if (finished.mode === 'point') {
+      gestureKind = 'drag-point'
       saveStore('keypoints')
       render()
       return
@@ -2603,6 +2838,7 @@ function initCanvas() {
         const box = pointsFor(selected.name)[next]
         activeLabel = box.label || activeLabel
       }
+      gestureKind = finished.mode === 'resize' ? 'resize-box' : 'move-box'
       saveStore('boxes')
       freshBox = true
       updateList()
@@ -2624,7 +2860,9 @@ function initCanvas() {
       const index = hitPoint(ev.clientX, ev.clientY)
       if (index === null) return
       const name = images[current].name
+      const before = snapshotOf('keypoints', name)
       pointsFor(name).splice(index, 1)
+      recordChange('keypoints', name, before, snapshotOf('keypoints', name), 'delete')
       selected = null
       saveStore('keypoints')
       updateList()
@@ -2637,7 +2875,9 @@ function initCanvas() {
     const index = hitBox(ev.clientX, ev.clientY)
     if (index === null) return
     const name = images[current].name
+    const before = snapshotOf('boxes', name)
     pointsFor(name).splice(index, 1)
+    recordChange('boxes', name, before, snapshotOf('boxes', name), 'delete')
     selected = null
     saveStore('boxes')
     updateList()
@@ -2674,6 +2914,29 @@ function initKeyboard() {
   window.addEventListener('keydown', (ev) => {
     if (ev.target instanceof HTMLTextAreaElement) return
     if (ev.target instanceof HTMLInputElement && ev.target.type !== 'range') return
+
+    const mod = ev.metaKey || ev.ctrlKey
+    if (mod && (ev.key === 'z' || ev.key === 'Z')) {
+      ev.preventDefault()
+      if (ev.shiftKey) redo()
+      else undo()
+      return
+    }
+    if (mod && (ev.key === 'y' || ev.key === 'Y')) {
+      ev.preventDefault()
+      redo()
+      return
+    }
+    if (!mod && (ev.key === 'u' || ev.key === 'U')) {
+      ev.preventDefault()
+      undo()
+      return
+    }
+    if (!mod && (ev.key === 'r' || ev.key === 'R')) {
+      ev.preventDefault()
+      redo()
+      return
+    }
 
     if (ev.key === 'Escape') {
       selected = null
@@ -2733,8 +2996,10 @@ function initKeyboard() {
       else {
         activeLabel = label
         if (selected && selected.name === images[current]?.name) {
+          const before = snapshotOf('boxes', selected.name)
           stores.boxes[selected.name][selected.index].label = label
           saveStore('boxes')
+          recordChange('boxes', selected.name, before, snapshotOf('boxes', selected.name), 'label')
           updateCountLabel()
         }
         renderLabelChips()
@@ -2753,7 +3018,9 @@ function initKeyboard() {
     if (!target) return
 
     if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      const before = snapshotOf(mode, name)
       list.splice(selected.index, 1)
+      recordChange(mode, name, before, snapshotOf(mode, name), 'delete')
       selected = null
       saveStore(mode)
       updateList()
@@ -2772,6 +3039,7 @@ function initKeyboard() {
     else return
 
     ev.preventDefault()
+    const beforeNudge = snapshotOf(mode, name)
     if (mode === 'boxes') {
       target.x = clamp(target.x + dx, 0, images[current].width - target.w)
       target.y = clamp(target.y + dy, 0, images[current].height - target.h)
@@ -2780,6 +3048,7 @@ function initKeyboard() {
       target.y = clamp(target.y + dy, 0, images[current].height - 1)
     }
     saveStore(mode)
+    recordChange(mode, name, beforeNudge, snapshotOf(mode, name), 'nudge')
     draw()
   })
 }
@@ -3261,6 +3530,8 @@ function init() {
     updateJson()
     relayout()
   }
+  $('undo').onclick = undo
+  $('redo').onclick = redo
   $('copy').onclick = copyJson
   $('download').onclick = downloadJson
   $('downloadzip').onclick = downloadZip
@@ -3271,8 +3542,10 @@ function init() {
     if (!images.length) return
     const name = images[current].name
     if (!confirm(`Clear annotations on “${name}”?`)) return
+    const before = snapshotOf(mode, name)
     if (mode === 'classes') delete stores.classes[name]
     else stores[mode][name] = []
+    recordChange(mode, name, before, snapshotOf(mode, name), 'clear')
     selected = null
     saveStore(mode)
     updateList()
