@@ -1213,7 +1213,7 @@ async function addVideo(file) {
   await selectVideo(videos.length - 1)
 }
 
-async function selectVideo(index) {
+async function selectVideo(index, { preview = true } = {}) {
   const video = videos[index]
   if (!video) return
 
@@ -1235,7 +1235,8 @@ async function selectVideo(index) {
   syncSlider()
   await waitReady(el, 2)
   previewArmed = false
-  updatePreview()
+  if (preview) updatePreview()
+  else annotateTarget = 'item'
 }
 
 function renderVideoTabs() {
@@ -1346,6 +1347,21 @@ function removeVideo(index, { record = true } = {}) {
   selectVideo(activeVideo)
 }
 
+/** move the video playhead (and the slider) onto a kept frame, without previewing it */
+async function syncVideoToFrame(name) {
+  const source = sources[name]
+  if (!source || source.kind !== 'video-frame') return
+  const index = videos.findIndex((video) => videoKey(video) === source.videoKey)
+  if (index === -1) return
+  if (index !== activeVideo) await selectVideo(index, { preview: false })
+  previewArmed = false
+  annotateTarget = 'item'
+  const el = $('vpreview')
+  el.currentTime = source.t
+  videos[activeVideo].time = source.t
+  syncSlider()
+}
+
 function renderVideoTicks() {
   const video = videos[activeVideo]
   const ticks = $('vticks')
@@ -1379,6 +1395,7 @@ function renderVideoTicks() {
       pendingFit = true
       render()
       updateList()
+      syncVideoToFrame(mark.name)
     }
     ticks.append(tick)
   }
@@ -2224,6 +2241,7 @@ function updateList() {
       selected = null
       pendingFit = true
       render()
+      syncVideoToFrame(image.name)
     }
     list.append(row)
   })
