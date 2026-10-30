@@ -1299,6 +1299,10 @@ async function selectVideo(index, { preview = true } = {}) {
   syncSlider()
   await waitReady(el, 2)
   previewArmed = false
+  if (!el.videoWidth) {
+    flash('This browser cannot play that video')
+    return
+  }
   if (preview) updatePreview()
   else annotateTarget = 'item'
 }
@@ -1424,6 +1428,10 @@ function removeVideo(index, { record = true } = {}) {
 
   if (index < activeVideo) activeVideo--
   else if (index === activeVideo) activeVideo = Math.min(activeVideo, videos.length - 1)
+  updateList()
+  renderVideoTicks()
+  if (marked) flash(`Closed ${video.name} — ${marked} frame(s) stay in the list`)
+  else flash(`Closed ${video.name}`)
   selectVideo(activeVideo)
 }
 
