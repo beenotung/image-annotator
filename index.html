@@ -2937,14 +2937,16 @@ function initCanvas() {
     if (drag.mode === 'resize') {
       const p = toImage(ev.clientX, ev.clientY)
       const start = drag.start
+      const size = imageSize()
+      const MIN = 4 // keep at least a hair of a box, and never leave the picture
       let x1 = start.x
       let y1 = start.y
       let x2 = start.x + start.w
       let y2 = start.y + start.h
-      if (drag.handle.includes('w')) x1 = p.x
-      if (drag.handle.includes('e')) x2 = p.x
-      if (drag.handle.includes('n')) y1 = p.y
-      if (drag.handle.includes('s')) y2 = p.y
+      if (drag.handle.includes('w')) x1 = clamp(p.x, 0, x2 - MIN)
+      if (drag.handle.includes('e')) x2 = clamp(p.x, x1 + MIN, size.w)
+      if (drag.handle.includes('n')) y1 = clamp(p.y, 0, y2 - MIN)
+      if (drag.handle.includes('s')) y2 = clamp(p.y, y1 + MIN, size.h)
       const rect = normalizeRect({ x: x1, y: y1 }, { x: x2, y: y2 })
       const box = pointsFor(name)[selected.index]
       Object.assign(box, rect)
