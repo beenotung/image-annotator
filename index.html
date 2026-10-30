@@ -1303,10 +1303,42 @@ async function selectVideo(index, { preview = true } = {}) {
   else annotateTarget = 'item'
 }
 
-/** step through the dataset list, keeping the video playhead in step */
+/** the sidebar's frames grouped by the video they came from */
+function groupFrames() {
+  const groups = videos.map((video) => {
+    const key = videoKey(video)
+    const indices = []
+    images.forEach((image, index) => {
+      const source = sources[image.name]
+      if (source && source.kind === 'video-frame' && source.videoKey === key) indices.push(index)
+    })
+    return { video, key, indices }
+  })
+  const claimed = new Set()
+  for (const group of groups) for (const index of group.indices) claimed.add(index)
+  const plain = images.map((image, index) => index).filter((index) => !claimed.has(index))
+  return { groups, plain }
+}
+
+/** image indices in the order they are on screen (collapsed videos contribute nothing) */
+function visibleImageOrder() {
+  const { groups, plain } = groupFrames()
+  const order = []
+  for (const group of groups) {
+    if (!collapsedVideos.has(group.key)) order.push(...group.indices)
+  }
+  return order.concat(plain)
+}
+
+/** step through what is visible in the sidebar, keeping the video playhead in step */
 function moveSelection(delta) {
   if (!images.length) return
-  const next = clamp(current + delta, 0, images.length - 1)
+  const order = visibleImageOrder()
+  if (!order.length) return
+  const at = order.indexOf(current)
+  const next = at === -1
+    ? order[delta > 0 ? 0 : order.length - 1]
+    : order[clamp(at + delta, 0, order.length - 1)]
   if (next === current && !previewing) return
   current = next
   selected = null
@@ -2388,25 +2420,14 @@ function updateList() {
   }
 
   // frames sit under the video they came from; plain images are top level
-  const claimed = new Set()
-  for (const video of videos) {
-    const key = videoKey(video)
-    const indices = []
-    images.forEach((image, index) => {
-      const source = sources[image.name]
-      if (source && source.kind === 'video-frame' && source.videoKey === key) {
-        indices.push(index)
-        claimed.add(index)
-      }
-    })
-    list.append(videoRow(video, indices))
-    if (!collapsedVideos.has(key)) {
-      for (const index of indices) list.append(imageRow(index, true))
+  const { groups, plain } = groupFrames()
+  for (const group of groups) {
+    list.append(videoRow(group.video, group.indices))
+    if (!collapsedVideos.has(group.key)) {
+      for (const index of group.indices) list.append(imageRow(index, true))
     }
   }
-  images.forEach((image, index) => {
-    if (!claimed.has(index)) list.append(imageRow(index, false))
-  })
+  for (const index of plain) list.append(imageRow(index, false))
 
   const active = list.querySelector('.item.active')
   if (active) active.scrollIntoView({ block: 'nearest' })
