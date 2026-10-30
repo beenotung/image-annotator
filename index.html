@@ -229,7 +229,8 @@
     opacity: .75;
   }
   #modes button.active .mcount { opacity: .9; }
-  #title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #count { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
   .muted { color: var(--muted); }
   #zoombar { display: flex; gap: 6px; align-items: center; margin-left: auto; }
   #zoombar button { padding: 4px 9px; }
@@ -373,6 +374,144 @@
     font: inherit;
     color: var(--fg);
   }
+
+  /* transient messages — absolutely positioned so they can never reflow the page */
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%) translateY(8px);
+    max-width: min(88vw, 760px);
+    padding: 8px 14px;
+    background: var(--panel-3);
+    color: var(--fg);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease;
+    z-index: 300;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- video frame picker ---------- */
+  #videopanel {
+    flex: 0 0 auto;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  #videopanel.hidden { display: none; }
+  .vhead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--line);
+    min-height: 36px;
+    overflow-x: auto;
+  }
+  .vhead .vtitle {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    white-space: nowrap;
+  }
+  #vtabs { display: flex; gap: 6px; }
+  .vtab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel-3);
+    color: var(--muted);
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    padding: 3px 9px;
+    cursor: pointer;
+    font: inherit;
+    white-space: nowrap;
+  }
+  .vtab:hover { border-color: var(--accent); }
+  .vtab.active {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .vtab .vcount { font-size: 11px; opacity: .8; font-variant-numeric: tabular-nums; }
+  .vtab .vx { opacity: .6; padding: 0 2px; border-radius: 3px; }
+  .vtab .vx:hover { opacity: 1; background: rgba(0, 0, 0, .25); }
+  #vcollapse { margin-left: auto; padding: 4px 9px; }
+
+  #videobody { display: flex; align-items: center; gap: 10px; padding: 6px 12px; }
+  #videopanel.collapsed #videobody { display: none; }
+  /* the video element stays in the DOM as the decode target, but the big canvas is the viewer */
+  #vpreview {
+    position: fixed;
+    left: -4px;
+    top: -4px;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  #vsliderwrap { flex: 1; min-width: 120px; display: flex; flex-direction: column; }
+  #vslider { width: 100%; margin: 0; accent-color: var(--accent); }
+  #vticks { position: relative; height: 10px; margin: 3px 8px 0; }
+  .vtick {
+    position: absolute;
+    top: 0;
+    width: 5px;
+    height: 10px;
+    margin-left: -2.5px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: var(--accent2);
+    cursor: pointer;
+  }
+  .vtick:hover { background: var(--accent); transform: scale(1.25, 1.15); }
+  .vtick.current { background: var(--accent); }
+  .vrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .vrow button { padding: 4px 8px; }
+  #vmark { background: #2f6b4f; }
+  #vmark.attn { animation: vpulse 1.1s ease-out 2; }
+  @keyframes vpulse {
+    0% { box-shadow: 0 0 0 0 rgba(70, 163, 122, .85); }
+    100% { box-shadow: 0 0 0 12px rgba(70, 163, 122, 0); }
+  }
+  #vstepunit, #vstepvalue {
+    background: var(--panel-3);
+    color: var(--fg);
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    padding: 3px 5px;
+    font: inherit;
+  }
+  #vstepvalue { width: 62px; font-variant-numeric: tabular-nums; }
+  #vtime { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #vframe { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #vfps { cursor: pointer; white-space: nowrap; }
+  #vfps:hover { color: var(--accent); }
+  .vnote { color: var(--muted); font-size: 11px; }
+  .vnote b { color: var(--fg); font-weight: 600; }
+
+  /* sidebar badge for frames captured from video */
+  .item .vb {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    border-radius: 3px;
+    padding: 0 3px;
+    opacity: .85;
+    flex: 0 0 auto;
+  }
 </style>
 </head>
 <body>
@@ -386,11 +525,14 @@
     <div id="boxrows"></div>
   </div>
   <div class="foot">
-    <label class="file">Add images…
+    <label class="file">Add images / ZIP…
       <input id="picker" type="file" accept="image/*" multiple>
     </label>
+    <label class="file">Add video…
+      <input id="videopicker" type="file" accept="video/*" multiple>
+    </label>
     <label class="file">Add folder…
-      <input id="folder" type="file" accept="image/*,.json,application/json" webkitdirectory multiple>
+      <input id="folder" type="file" accept="image/*,video/*,.json,application/json" webkitdirectory multiple>
     </label>
     <button id="importfile" class="ghost">Import annotations JSON…</button>
     <input id="jsonfile" type="file" accept=".json,application/json" hidden>
@@ -427,11 +569,41 @@
     </label>
   </div>
 
+  <div id="videopanel" class="hidden">
+    <div class="vhead">
+      <span class="vtitle">Video</span>
+      <span id="vtabs"></span>
+      <button id="vcollapse" class="ghost" title="Collapse / expand the frame picker">Collapse</button>
+    </div>
+    <div id="videobody">
+      <video id="vpreview" muted playsinline></video>
+      <div id="vsliderwrap">
+        <input id="vslider" type="range" min="0" max="1000" step="1" value="0" aria-label="Video position">
+        <div id="vticks"></div>
+      </div>
+      <div class="vrow">
+        <button id="vprev" class="ghost" title="Back one frame ( [ )">‹</button>
+        <button id="vplay" class="ghost" title="Play / pause (Space)">▶</button>
+        <button id="vnext" class="ghost" title="Forward one frame ( ] )">›</button>
+        <button id="vmark" title="Keep this frame in the dataset, then annotate it (M) — or just click the picture">Mark frame</button>
+        <input id="vstepvalue" type="number" min="0.01" step="any" value="1"
+               title="How far the arrow keys and ‹ › jump — type any amount">
+        <select id="vstepunit" title="Jump by frames or by seconds">
+          <option value="frame">frames</option>
+          <option value="sec">sec</option>
+        </select>
+        <span id="vtime">0:00.000</span>
+        <span id="vframe" class="muted"></span>
+        <span id="vfps" class="muted" title="Click to measure the frame rate — the frame index is only reported when fps is measured">fps –</span>
+      </div>
+    </div>
+  </div>
+
   <div id="stagewrap">
     <canvas id="stage"></canvas>
     <div id="drop">
-      <b>Drop images or a folder here</b>
-      <span>or use “Add images…” / “Add folder…” on the left</span>
+      <b>Drop images, a video, a ZIP or a folder here</b>
+      <span>or use “Add images / ZIP…”, “Add video…” or “Add folder…” on the left</span>
       <span id="drophelp">Click to add a keypoint · drag to pan · scroll to zoom</span>
     </div>
   </div>
@@ -442,7 +614,7 @@
   <textarea id="json" spellcheck="false"></textarea>
   <div id="jsonactions">
     <button id="copy">Copy</button>
-    <button id="download" class="ghost">Download</button>
+    <button id="download" class="ghost">Download JSON</button>
     <button id="import" class="ghost">Import from box</button>
     <button id="importfile2" class="ghost">Import file…</button>
     <button id="selectall" class="ghost">Select all</button>
@@ -453,16 +625,21 @@
     <kbd>1…9</kbd> labels ·
     <kbd>F</kbd> fit ·
     <kbd>Esc</kbd> deselect<br>
+    Video: <kbd>←</kbd> <kbd>→</kbd> jump (size in the picker, <kbd>Shift</kbd> ×10) ·
+    <kbd>M</kbd> or <b>click the picture</b> to keep that frame · <kbd>Space</kbd> play/pause<br>
+    Arrows nudge the selected point instead — <kbd>Esc</kbd> first to jump again<br>
     Click again to cycle overlapping boxes · <kbd>Alt</kbd>-click to cycle<br>
     Saved in this browser (localStorage), keyed by filename.<br>
-    <b>Tip:</b> drop an annotations <code>.json</code> anywhere to import it.
+    <b>Tip:</b> drop images, a video, a folder or an annotations <code>.json</code> anywhere.
   </div>
 </div>
 
+<div id="toast"></div>
+
 <div id="dropveil">
   <div class="card">
-    <div class="big">Drop images, a folder, or an annotations .json</div>
-    <div class="sub">Release anywhere on this page. A folder is scanned for images; a .json imports its annotations. The browser will not open the file.</div>
+    <div class="big">Drop images, a video, a folder, or an annotations .json</div>
+    <div class="sub">Release anywhere on this page. A folder is scanned recursively; a ZIP from the video frame extractor is read as images; a .json imports its annotations. The browser will not open the file.</div>
   </div>
 </div>
 
@@ -480,10 +657,19 @@ const STORE = {
   mode: 'image-annotator:mode',
   multi: 'image-annotator:multi',
   theme: 'image-annotator:theme',
+  sources: 'image-annotator:sources',
 }
 
-/** images: [{ name, url, width, height }] */
+/** images: [{ name, url, width, height, blob }] */
 let images = []
+/**
+ * videos: [{ name, size, mtime, url, duration, width, height, fps, fpsSource, time, marked }]
+ * fps === 0 means "not measured yet" (frame index is then reported as unknown).
+ */
+let videos = []
+let activeVideo = -1
+/** provenance for frames captured from a video: name -> { kind, video, t, frame, ... } */
+let sources = {}
 /** per-mode annotation stores */
 let stores = {
   keypoints: {}, // name -> [{ x, y, label }]
@@ -498,10 +684,22 @@ let stageColor = '#0a0a0a'
 let mode = 'keypoints'
 let current = 0
 let selected = null // {name, index} for keypoints/boxes
+/** a box that was just drawn/moved — arrows keep navigating until you click it */
+let freshBox = false
+/** snapshot taken on pointerdown, committed on pointerup */
+/** true when the gesture started on the video (preview on screen, or a scrub still landing) */
+let gestureOnVideo = false
+/** 'video' while the slider owns the stage, 'item' once a dataset frame is selected */
+let annotateTarget = 'item'
 let view = { scale: 1, tx: 0, ty: 0 }
 let pendingFit = true
 let currentImage = null
 let renderToken = 0
+/** true while the stage shows a live video frame instead of a dataset item */
+let previewing = false
+let previewCanvas = null
+/** the big canvas follows the video only while this is armed (i.e. after the user scrubbed) */
+let previewArmed = false
 
 const $ = (id) => document.getElementById(id)
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
@@ -524,6 +722,13 @@ function loadState() {
     labelSet = []
   }
   if (!Array.isArray(labelSet)) labelSet = []
+  try {
+    const raw = localStorage.getItem(STORE.sources)
+    sources = raw ? JSON.parse(raw) : {}
+  } catch {
+    sources = {}
+  }
+  if (!sources || typeof sources !== 'object') sources = {}
   activeLabel = labelSet[0] || ''
   multiLabel = localStorage.getItem(STORE.multi) === '1'
   const savedTheme = localStorage.getItem(STORE.theme)
@@ -544,10 +749,16 @@ function saveLabels() {
   updateJson()
 }
 
+function saveSources() {
+  localStorage.setItem(STORE.sources, JSON.stringify(sources))
+  updateJson()
+}
+
 function setMode(next) {
   if (!MODES.includes(next) || next === mode) return
   mode = next
   selected = null
+  freshBox = false
   localStorage.setItem(STORE.mode, mode)
   history.replaceState(null, '', '#' + mode)
   applyModeChrome()
@@ -680,7 +891,12 @@ async function addFiles(fileList) {
   let addedAny = false
 
   for (const file of files) {
-    if (file.type === 'application/json' || file.name.endsWith('.json')) {
+    const lower = file.name.toLowerCase()
+    if (file.type.startsWith('video/') || /\.(mp4|m4v|mov|webm|ogv|mkv|avi)$/.test(lower)) {
+      await addVideo(file)
+      continue
+    }
+    if (file.type === 'application/json' || lower.endsWith('.json')) {
       await importJsonText(await file.text())
       continue
     }
@@ -688,7 +904,11 @@ async function addFiles(fileList) {
 
     const url = URL.createObjectURL(file)
     const img = await loadElement(url)
-    const entry = { name: file.name, url, width: img.naturalWidth, height: img.naturalHeight }
+    const entry = {
+      name: file.name, url,
+      width: img.naturalWidth, height: img.naturalHeight,
+      blob: file,
+    }
     const existing = images.findIndex((item) => item.name === file.name)
     if (existing !== -1) {
       URL.revokeObjectURL(images[existing].url)
@@ -707,6 +927,629 @@ async function addFiles(fileList) {
     }
     updateList()
   }
+}
+
+/* ----------------------------------------------------- video frame picker */
+
+const pad2 = (n) => String(n).padStart(2, '0')
+
+/** 00.04.160 — same shape as the frame extractor's timestamp tag */
+function timeTag(seconds) {
+  let ms = Math.round(Math.max(0, seconds) * 1000)
+  const h = Math.floor(ms / 3600000)
+  ms -= h * 3600000
+  const m = Math.floor(ms / 60000)
+  ms -= m * 60000
+  const s = Math.floor(ms / 1000)
+  ms -= s * 1000
+  return `${pad2(h)}.${pad2(m)}.${pad2(s)}.${String(ms).padStart(3, '0')}`
+}
+
+function clock(seconds) {
+  const t = Math.max(0, seconds || 0)
+  const m = Math.floor(t / 60)
+  const s = t - m * 60
+  return `${m}:${s.toFixed(3).padStart(6, '0')}`
+}
+
+const IMAGE_MIME = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+  gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif',
+}
+
+function mimeFor(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase()
+  return IMAGE_MIME[ext] || 'application/octet-stream'
+}
+
+function videoKey(video) {
+  return `${video.name}|${video.size}|${video.mtime}`
+}
+
+function once(el, event, timeout = 4000) {
+  // a media event that already fired will never fire again, so always bail out
+  return new Promise((resolve) => {
+    let timer = 0
+    const done = () => {
+      clearTimeout(timer)
+      el.removeEventListener(event, done)
+      resolve()
+    }
+    el.addEventListener(event, done, { once: true })
+    timer = setTimeout(done, timeout)
+  })
+}
+
+/** wait until the element can actually decode (readyState >= state) */
+async function waitReady(el, state, timeout = 4000) {
+  const started = Date.now()
+  while (el.readyState < state && Date.now() - started < timeout) {
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  }
+  return el.readyState >= state
+}
+
+function probeVideo(url) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('video')
+    el.preload = 'metadata'
+    el.muted = true
+    el.onloadedmetadata = () => resolve({
+      duration: el.duration,
+      width: el.videoWidth,
+      height: el.videoHeight,
+    })
+    el.onerror = () => reject(new Error('This browser cannot decode that video (codec not supported)'))
+    el.src = url
+  })
+}
+
+async function addVideo(file) {
+  const existing = videos.findIndex(
+    (video) => video.name === file.name && video.size === file.size && video.mtime === file.lastModified,
+  )
+  if (existing !== -1) {
+    await selectVideo(existing)
+    flash('That video is already open')
+    return
+  }
+
+  const url = URL.createObjectURL(file)
+  let meta
+  try {
+    meta = await probeVideo(url)
+  } catch (error) {
+    URL.revokeObjectURL(url)
+    flash(error.message)
+    return
+  }
+
+  videos.push({
+    name: file.name,
+    size: file.size,
+    mtime: file.lastModified,
+    file,
+    url,
+    duration: Number.isFinite(meta.duration) ? meta.duration : 0,
+    width: meta.width,
+    height: meta.height,
+    fps: 0,
+    fpsSource: 'unknown',
+    time: 0,
+    marked: [],
+  })
+  $('videopanel').classList.remove('hidden')
+  await selectVideo(videos.length - 1)
+}
+
+async function selectVideo(index) {
+  const video = videos[index]
+  if (!video) return
+
+  const el = $('vpreview')
+  const previous = videos[activeVideo]
+  if (previous && previous !== video && el.readyState >= 1) {
+    previous.time = el.currentTime || previous.time
+  }
+
+  activeVideo = index
+  previewArmed = true
+  annotateTarget = 'video'
+  el.src = video.url
+  await waitReady(el, 1)
+  el.currentTime = Math.min(Math.max(0, video.time || 0), Math.max(0, (video.duration || 0) - 0.001))
+  renderVideoTabs()
+  renderVideoTicks()
+  updateVideoTime()
+  syncSlider()
+  await waitReady(el, 2)
+  previewArmed = false
+  updatePreview()
+}
+
+function renderVideoTabs() {
+  const wrap = $('vtabs')
+  wrap.innerHTML = ''
+
+  videos.forEach((video, index) => {
+    const tab = document.createElement('button')
+    tab.className = 'vtab' + (index === activeVideo ? ' active' : '')
+    tab.title = `${video.name} · ${clock(video.duration)} · ${video.width}×${video.height}`
+
+    const label = document.createElement('span')
+    label.textContent = video.name
+
+    const count = document.createElement('span')
+    count.className = 'vcount'
+    count.textContent = video.marked.length ? `${video.marked.length} marked` : 'none marked'
+
+    const x = document.createElement('span')
+    x.className = 'vx'
+    x.textContent = '×'
+    x.title = 'Close this video (keeps the frames already marked)'
+    x.onclick = (ev) => {
+      ev.stopPropagation()
+      removeVideo(index)
+    }
+
+    tab.append(label, count, x)
+    tab.onclick = () => selectVideo(index)
+    wrap.append(tab)
+  })
+}
+
+function removeVideo(index) {
+  const video = videos[index]
+  if (!video) return
+  // no confirm: closing the tab keeps every marked frame, and undo brings the video back
+  const marked = video.marked.length
+
+  URL.revokeObjectURL(video.url)
+  videos.splice(index, 1)
+
+  if (!videos.length) {
+    activeVideo = -1
+    $('vpreview').removeAttribute('src')
+    $('videopanel').classList.add('hidden')
+    renderVideoTabs()
+    renderVideoTicks()
+    if (marked) flash(`Closed ${video.name} — ${marked} frame(s) stay in the list`)
+    else flash(`Closed ${video.name}`)
+    if (previewing) {
+      previewing = false
+      currentImage = null
+      if (images.length) {
+        current = clamp(current, 0, images.length - 1)
+        pendingFit = true
+        render()
+      } else {
+        const ctx = $('stage').getContext('2d')
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.clearRect(0, 0, $('stage').width, $('stage').height)
+        $('title').textContent = 'No image'
+        $('count').textContent = ''
+        $('drop').style.display = 'flex'
+      }
+    }
+    return
+  }
+
+  if (index < activeVideo) activeVideo--
+  else if (index === activeVideo) activeVideo = Math.min(activeVideo, videos.length - 1)
+  selectVideo(activeVideo)
+}
+
+function renderVideoTicks() {
+  const video = videos[activeVideo]
+  const ticks = $('vticks')
+  ticks.innerHTML = ''
+  if (!video || !video.duration) return
+
+  // keep them clickable in time order, and never overlap into an unhittable pile
+  const marks = []
+  for (const name of video.marked) {
+    const entry = sources[name]
+    if (entry) marks.push({ name, t: entry.t, frame: entry.frame })
+  }
+  marks.sort((a, b) => a.t - b.t)
+
+  const currentName = images[current]?.name
+  for (const mark of marks) {
+    const tick = document.createElement('button')
+    tick.className = 'vtick' + (mark.name === currentName ? ' current' : '')
+    tick.style.left = `${(mark.t / video.duration) * 100}%`
+    tick.title = `${clock(mark.t)}${mark.frame === null ? '' : ` · frame ${mark.frame}`} — click to open this frame for annotation`
+    tick.setAttribute('aria-label', tick.title)
+    tick.onclick = (ev) => {
+      ev.stopPropagation()
+      const index = images.findIndex((image) => image.name === mark.name)
+      if (index === -1) {
+        flash('That frame is no longer in the list')
+        return
+      }
+      current = index
+      selected = null
+      pendingFit = true
+      render()
+      updateList()
+    }
+    ticks.append(tick)
+  }
+}
+
+function syncSlider() {
+  const video = videos[activeVideo]
+  if (!video) return
+  const el = $('vpreview')
+  const slider = $('vslider')
+  slider.max = String(Math.max(1, Math.round((video.duration || 0) * 1000)))
+  // snap the track to whole frames once fps is known, so dragging and arrow keys land on frames
+  slider.step = video.fps ? String(Math.round(10000 / video.fps) / 10) : '1'
+  if (document.activeElement !== slider) {
+    slider.value = String(Math.round((el.currentTime || 0) * 1000))
+  }
+  updateVideoTime()
+}
+
+function updateVideoTime() {
+  const video = videos[activeVideo]
+  if (!video) return
+  const el = $('vpreview')
+  // while a scrub target is outstanding, show it immediately instead of waiting for decode
+  const time = seekShown !== null ? seekShown : (el.currentTime || 0)
+  $('vtime').textContent = clock(time)
+  $('vframe').textContent = video.fps ? `frame ${Math.round(time * video.fps)}` : 'frame –'
+  $('vfps').textContent = video.fps ? `fps ${video.fps.toFixed(2)}` : 'fps –'
+  $('vplay').textContent = el.paused ? '▶' : '❚❚'
+}
+
+/**
+ * Scrubbing fires dozens of input events per second. Issuing one seek per event
+ * makes the decoder thrash (each seek restarts from the previous keyframe), so we
+ * keep only the latest target and let at most one seek be in flight.
+ */
+let seekTarget = null
+let seekQueued = false
+let seekShown = null
+
+function seekVideo(seconds) {
+  const video = videos[activeVideo]
+  if (!video) return
+  const limit = Math.max(0, (video.duration || 0) - 0.001)
+  seekTarget = clamp(seconds, 0, limit)
+  seekShown = seekTarget
+  video.time = seekTarget
+  pumpSeek()
+  syncSlider()
+}
+
+function pumpSeek() {
+  if (seekQueued) return
+  seekQueued = true
+  requestAnimationFrame(() => {
+    seekQueued = false
+    const video = videos[activeVideo]
+    const el = $('vpreview')
+    if (!video || seekTarget === null) return
+    if (el.readyState < 1) {
+      setTimeout(pumpSeek, 150) // not decodable yet; try again shortly
+      return
+    }
+    if (el.seeking) return // wait for 'seeked' — it pumps the next target
+    const target = seekTarget
+    seekTarget = null
+    const tolerance = video.fps ? 0.5 / video.fps : 0.005
+    if (Math.abs(el.currentTime - target) <= tolerance) {
+      seekShown = null
+      updateVideoTime()
+      return
+    }
+    el.currentTime = target
+    video.time = target
+    updateVideoTime()
+  })
+}
+
+/** Mirror the frame under the slider onto the big stage (read-only preview). */
+function updatePreview() {
+  const video = videos[activeVideo]
+  const el = $('vpreview')
+  if (!video) return
+  if (el.readyState < 2) {
+    // the element is (re)loading; paint as soon as the first frame is decodable
+    if (!el.dataset.previewPending) {
+      el.dataset.previewPending = '1'
+      waitReady(el, 2).then(() => {
+        delete el.dataset.previewPending
+        updatePreview()
+      })
+    }
+    return
+  }
+  if (!el.videoWidth) return
+
+  if (!previewCanvas) previewCanvas = document.createElement('canvas')
+  if (previewCanvas.width !== el.videoWidth || previewCanvas.height !== el.videoHeight) {
+    previewCanvas.width = el.videoWidth
+    previewCanvas.height = el.videoHeight
+  }
+  previewCanvas.getContext('2d').drawImage(el, 0, 0)
+
+  annotateTarget = 'video'
+  const wasPreviewing = previewing
+  previewing = true
+  currentImage = previewCanvas
+  pendingFit = false
+
+  if (!wasPreviewing) {
+    resizeCanvas()
+    fitView()
+  } else {
+    draw()
+  }
+
+  $('drop').style.display = 'none'
+  $('title').textContent = `Preview · ${video.name} · ${clock(el.currentTime)}`
+  $('count').textContent = 'press M, click, or start drawing to keep this frame'
+  updateVideoTime()
+  if (!wasPreviewing) updateList()
+}
+
+
+const STEP_UNIT_KEY = 'image-annotator:stepunit'
+const STEP_VALUE_KEY = 'image-annotator:stepvalue'
+let stepUnit = 'frame'   // 'frame' | 'sec'
+let stepValue = 1
+
+/** distance of one arrow-key / ‹ › press, in seconds */
+function stepSeconds() {
+  const video = videos[activeVideo]
+  const amount = Number(stepValue) > 0 ? Number(stepValue) : (stepUnit === 'sec' ? 0.1 : 1)
+  if (stepUnit === 'sec') return amount
+  return amount / (video && video.fps ? video.fps : 30)
+}
+
+function stepFrame(direction, multiplier = 1) {
+  const video = videos[activeVideo]
+  if (!video) return
+  previewArmed = true
+  annotateTarget = 'video'
+  const el = $('vpreview')
+  if (stepUnit === 'frame' && !video.fps) {
+    flash('fps not measured yet — press M once (or click the fps label), then frame steps are exact')
+  }
+  // step from the pending target, not from the (still decoding) playhead, so
+  // two quick presses really mean two frames
+  const base = seekTarget !== null ? seekTarget : el.currentTime
+  seekVideo(base + direction * multiplier * stepSeconds())
+}
+
+function togglePlay() {
+  const el = $('vpreview')
+  if (!videos.length) return
+  if (el.paused) el.play().catch(() => {})
+  else el.pause()
+}
+
+/** Measure fps from presented-frame timestamps on a throwaway element, so the
+ *  preview's playhead (and the frame the user picked) is never disturbed. */
+async function measureFps() {
+  const video = videos[activeVideo]
+  if (!video || typeof HTMLVideoElement.prototype.requestVideoFrameCallback !== 'function') return null
+
+  const probe = document.createElement('video')
+  probe.muted = true
+  probe.playsInline = true
+  probe.preload = 'auto'
+  probe.style.cssText = 'position:fixed;left:-2px;top:-2px;width:2px;height:2px;opacity:0;pointer-events:none'
+  probe.src = video.url
+  document.body.append(probe)
+
+  const times = []
+  let handle = 0
+  const onFrame = (_now, meta) => {
+    times.push(meta.mediaTime)
+    if (times.length < 26) handle = probe.requestVideoFrameCallback(onFrame)
+  }
+
+  try {
+    if (probe.readyState < 1) {
+      await new Promise((resolve, reject) => {
+        probe.addEventListener('loadedmetadata', resolve, { once: true })
+        probe.addEventListener('error', () => reject(new Error('cannot probe')), { once: true })
+      })
+    }
+    handle = probe.requestVideoFrameCallback(onFrame)
+    await probe.play()
+    const started = Date.now()
+    while (times.length < 26 && Date.now() - started < 2500) {
+      await new Promise((resolve) => setTimeout(resolve, 40))
+    }
+  } catch {
+    return null
+  } finally {
+    if (handle) probe.cancelVideoFrameCallback(handle)
+    probe.pause()
+    probe.removeAttribute('src')
+    probe.load()
+    probe.remove()
+  }
+
+  const deltas = []
+  for (let i = 1; i < times.length; i++) deltas.push(times[i] - times[i - 1])
+  if (!deltas.length) return null
+  deltas.sort((a, b) => a - b)
+  const median = deltas[Math.floor(deltas.length / 2)]
+  if (!median || !Number.isFinite(median)) return null
+
+  const raw = 1 / median
+  const common = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 120]
+  let best = null
+  for (const rate of common) {
+    if (Math.abs(rate - raw) / rate < 0.02 && (!best || Math.abs(rate - raw) < Math.abs(best - raw))) {
+      best = rate
+    }
+  }
+  video.fps = best || Math.round(raw * 100) / 100
+  video.fpsSource = 'measured'
+  updateVideoTime()
+  return video.fps
+}
+
+function uniqueName(base, name) {
+  if (!images.some((image) => image.name === name)) return name
+  // same video + same time already captured: keep that entry (annotations stay attached)
+  return name
+}
+
+async function markFrame() {
+  const video = videos[activeVideo]
+  const el = $('vpreview')
+  if (!video) return
+  previewArmed = false
+  // the slider is the source of truth: a newer target wins over the decoded playhead
+  const target = seekTarget !== null ? seekTarget : (seekShown !== null ? seekShown : el.currentTime)
+  seekTarget = null
+  seekShown = null
+
+  // a seek in flight drops readyState back to HAVE_METADATA — wait for the decoder
+  // instead of refusing to keep the frame
+  if (el.readyState < 2 && !(await waitReady(el, 2, 5000))) {
+    flash('Video is still loading')
+    return null
+  }
+
+  el.pause()
+  if (Math.abs(el.currentTime - target) > 0.0005) {
+    el.currentTime = target
+    await once(el, 'seeked')
+  }
+  if (!video.fps) await measureFps()
+
+  const time = el.currentTime
+  video.time = time
+  syncSlider()
+  const tolerance = video.fps ? 0.5 / video.fps : 0.02
+  const duplicate = images.find((image) => {
+    const entry = sources[image.name]
+    return entry && entry.videoKey === videoKey(video) && Math.abs(entry.t - time) <= tolerance
+  })
+  if (duplicate) {
+    current = images.indexOf(duplicate)
+    selected = null
+    pendingFit = true
+    await render()
+    updateList()
+    flash('That frame is already marked — showing it')
+    return duplicate
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = el.videoWidth
+  canvas.height = el.videoHeight
+  canvas.getContext('2d').drawImage(el, 0, 0)
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+  if (!blob) {
+    flash('Cannot capture this frame')
+    return null
+  }
+
+  const frame = video.fps ? Math.round(time * video.fps) : null
+  const sequence = video.marked.length + 1
+  const base = video.name
+    .replace(/\.[^.]+$/, '')
+    .replace(/[/\\?%*:|"<>]/g, '_')
+  const name = uniqueName(base, `${base}_frame${frame === null ? sequence : frame}_${timeTag(time)}.jpg`)
+
+  const url = URL.createObjectURL(blob)
+  const entry = { name, url, width: canvas.width, height: canvas.height, blob }
+  const existingIndex = images.findIndex((image) => image.name === name)
+  if (existingIndex !== -1) {
+    URL.revokeObjectURL(images[existingIndex].url)
+    images[existingIndex] = entry
+  } else {
+    images.push(entry)
+  }
+
+  sources[name] = {
+    kind: 'video-frame',
+    video: video.name,
+    videoKey: videoKey(video),
+    videoSize: video.size,
+    videoMtime: video.mtime,
+    t: Number(time.toFixed(6)),
+    frame,
+    fps: video.fps || null,
+    fpsSource: video.fps ? 'measured' : 'unknown',
+    w: canvas.width,
+    h: canvas.height,
+    frameSource: 'seek',
+  }
+  if (!video.marked.includes(name)) video.marked.push(name)
+  saveSources()
+
+  current = images.indexOf(entry)
+  selected = null
+  pendingFit = true
+  await render()
+  updateList()
+  renderVideoTabs()
+  renderVideoTicks()
+  flash(`Marked ${name}`)
+  return entry
+}
+
+/**
+ * Keep the frame that is on screen, then apply an annotation to it. Drawing on the
+ * video is what creates the dataset item — browsing never does.
+ */
+async function keepFrameThen(apply) {
+  if (!videos.length) return
+  const entry = await markFrame()
+  if (!entry) return
+
+  apply()
+  saveStore(mode)
+
+  updateList()
+  updateCountLabel()
+  renderLabelChips()
+  updateBoxList()
+  draw()
+}
+
+/** one keypoint at a client point, on whatever image is current */
+function addPointAt(clientX, clientY) {
+  if (mode !== 'keypoints' || !images.length) return
+  const name = images[current].name
+  const p = toImage(clientX, clientY)
+  if (!insideImage(p)) return
+  if (!stores.keypoints[name]) stores.keypoints[name] = []
+  const list = stores.keypoints[name]
+  list.push({
+    x: clamp(p.x, 0, images[current].width - 1),
+    y: clamp(p.y, 0, images[current].height - 1),
+    label: 'p' + (list.length + 1),
+  })
+  selected = { name, index: list.length - 1 }
+  saveStore('keypoints')
+  updateList()
+  updateCountLabel()
+  draw()
+}
+
+/** one box on whatever image is current */
+function pushBox(rect) {
+  const name = images[current].name
+  if (!stores.boxes[name]) stores.boxes[name] = []
+  stores.boxes[name].push({ ...rect, label: activeLabel })
+  selected = { name, index: stores.boxes[name].length - 1 }
+  freshBox = true
+  saveStore('boxes')
+  updateList()
+  updateCountLabel()
+  renderLabelChips()
+  draw()
 }
 
 /* -------------------------------------------------------------- drawing */
@@ -732,19 +1575,28 @@ function applyView() {
   draw()
 }
 
+function imageSize(img = currentImage) {
+  if (!img) return { w: 0, h: 0 }
+  return {
+    w: img.naturalWidth || img.width || 0,
+    h: img.naturalHeight || img.height || 0,
+  }
+}
+
 function fitView() {
   const wrap = $('stagewrap')
   if (!currentImage) return
+  const size = imageSize()
   const availW = Math.max(50, wrap.clientWidth - 32)
   const availH = Math.max(50, wrap.clientHeight - 32)
   const scale = Math.min(
-    availW / currentImage.naturalWidth,
-    availH / currentImage.naturalHeight,
+    availW / size.w,
+    availH / size.h,
     1,
   )
   view.scale = scale
-  view.tx = (wrap.clientWidth - currentImage.naturalWidth * scale) / 2
-  view.ty = (wrap.clientHeight - currentImage.naturalHeight * scale) / 2
+  view.tx = (wrap.clientWidth - size.w * scale) / 2
+  view.ty = (wrap.clientHeight - size.h * scale) / 2
   applyView()
 }
 
@@ -799,9 +1651,11 @@ function draw() {
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(currentImage, 0, 0)
 
-  if (mode === 'keypoints') drawKeypoints(ctx, scale)
-  else if (mode === 'boxes') drawBoxes(ctx, scale, dpr)
-  else drawClasses(ctx, scale)
+  if (!previewing) {
+    if (mode === 'keypoints') drawKeypoints(ctx, scale)
+    else if (mode === 'boxes') drawBoxes(ctx, scale, dpr)
+    else drawClasses(ctx, scale)
+  }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 }
@@ -910,11 +1764,14 @@ function drawClasses(ctx, scale) {
 }
 
 async function render() {
+  annotateTarget = 'item'
   if (!images.length) {
     $('title').textContent = 'No image'
     $('count').textContent = ''
     return
   }
+  previewing = false
+  previewArmed = false
   const token = ++renderToken
   const image = images[current]
   const img = await loadElement(image.url)
@@ -953,11 +1810,12 @@ function updateList() {
   $('progressfill').style.width = total ? `${(done / total) * 100}%` : '0%'
   updateModeCounts()
   updateBoxList()
+  renderVideoTicks()
 
   if (!images.length) {
     const empty = document.createElement('div')
     empty.className = 'empty'
-    empty.textContent = 'Drop images or a folder here, or use the buttons below.'
+    empty.textContent = 'Drop images, a video, a ZIP or a folder here, or use the buttons below.'
     list.append(empty)
     return
   }
@@ -965,7 +1823,7 @@ function updateList() {
   images.forEach((image, index) => {
     const n = countFor(image.name)
     const row = document.createElement('div')
-    row.className = 'item' + (index === current ? ' active' : '') + (n ? ' done' : '')
+    row.className = 'item' + (!previewing && index === current ? ' active' : '') + (n ? ' done' : '')
 
     const idx = document.createElement('span')
     idx.className = 'idx'
@@ -974,6 +1832,14 @@ function updateList() {
     const nm = document.createElement('span')
     nm.className = 'nm'
     nm.textContent = image.name
+
+    const source = sources[image.name]
+    const vb = source && source.kind === 'video-frame' ? document.createElement('span') : null
+    if (vb) {
+      vb.className = 'vb'
+      vb.textContent = 'vid'
+      vb.title = `${source.video} @ ${clock(source.t)}${source.frame === null ? '' : ` · frame ${source.frame}`}`
+    }
 
     const cnt = document.createElement('span')
     cnt.className = 'cnt' + (n ? ' has' : '')
@@ -988,8 +1854,12 @@ function updateList() {
       removeImage(index)
     }
 
-    row.append(idx, nm, cnt, rm)
-    row.title = image.name
+    row.append(idx, nm)
+    if (vb) row.append(vb)
+    row.append(cnt, rm)
+    row.title = source && source.kind === 'video-frame'
+      ? `${image.name}\n${source.video} @ ${clock(source.t)}${source.frame === null ? '' : ` · frame ${source.frame}`}`
+      : image.name
     row.onclick = () => {
       current = index
       selected = null
@@ -1079,6 +1949,7 @@ function updateBoxList() {
     row.title = box.label || ''
     row.onclick = () => {
       selected = { name, index }
+      freshBox = false
       activeLabel = box.label || activeLabel
       renderLabelChips()
       updateBoxList()
@@ -1091,6 +1962,18 @@ function updateBoxList() {
 function removeImage(index) {
   const image = images[index]
   if (!image) return
+
+  // dropping a captured frame also drops its marker on the video timeline
+  const source = sources[image.name]
+  if (source && source.kind === 'video-frame') {
+    for (const video of videos) {
+      const at = video.marked.indexOf(image.name)
+      if (at !== -1) video.marked.splice(at, 1)
+    }
+    renderVideoTabs()
+    renderVideoTicks()
+  }
+
   URL.revokeObjectURL(image.url)
   images.splice(index, 1)
   selected = null
@@ -1098,6 +1981,7 @@ function removeImage(index) {
   if (!images.length) {
     current = 0
     currentImage = null
+    previewing = false
     $('title').textContent = 'No image'
     $('count').textContent = ''
     $('drop').style.display = 'flex'
@@ -1105,6 +1989,8 @@ function removeImage(index) {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, $('stage').width, $('stage').height)
     updateList()
+    // the video is still open — fall back to showing it instead of an empty stage
+    if (videos.length && activeVideo >= 0) selectVideo(activeVideo)
     return
   }
 
@@ -1166,7 +2052,7 @@ function renderLabelChips() {
       chip.classList.toggle('active', label === activeLabel)
       chip.onclick = () => {
         activeLabel = label
-        if (selected && mode === 'boxes' && selected.name === images[current]?.name) {
+        if (!previewing && selected && mode === 'boxes' && selected.name === images[current]?.name) {
           stores.boxes[selected.name][selected.index].label = label
           saveStore('boxes')
           updateCountLabel()
@@ -1197,6 +2083,10 @@ function renderLabelChips() {
 }
 
 function toggleClass(label) {
+  if (previewing) {
+    keepFrameThen(() => toggleClass(label))
+    return
+  }
   if (!images.length) return
   const name = images[current].name
   const entry = classEntry(name)
@@ -1251,9 +2141,10 @@ function removeLabel(label) {
 /* ------------------------------------------------- coordinate mapping */
 
 function insideImage(p) {
-  const img = images[current]
-  if (!img) return false
-  return p.x >= 0 && p.x <= img.width - 1 && p.y >= 0 && p.y <= img.height - 1
+  // in preview the stage holds the video frame, not a dataset item
+  const size = imageSize()
+  if (!size.w || !size.h) return false
+  return p.x >= 0 && p.x <= size.w - 1 && p.y >= 0 && p.y <= size.h - 1
 }
 
 function toImage(clientX, clientY) {
@@ -1322,13 +2213,26 @@ function initCanvas() {
   const wrap = $('stagewrap')
 
   canvas.addEventListener('pointerdown', (ev) => {
-    if (!images.length) return
+    if (!images.length && !previewing) return
     if (ev.button === 2) return
 
-    const name = images[current].name
+    const player = $('vpreview')
+    // the video is "on screen" also while a scrub is still landing — drawing then must
+    // still keep that frame instead of painting on the previously selected image
+    gestureOnVideo = videos.length > 0 && annotateTarget === 'video'
+
+    // on the video a drag draws (and keeps) a box; hold Alt to pan instead
+    if (gestureOnVideo && (mode !== 'boxes' || ev.altKey)) {
+      drag = { mode: 'pan', x: ev.clientX, y: ev.clientY, tx: view.tx, ty: view.ty, moved: false }
+      canvas.setPointerCapture(ev.pointerId)
+      return
+    }
+
+    const name = images[current] ? images[current].name : null
 
     if (mode === 'boxes') {
-      const handle = hitHandle(ev.clientX, ev.clientY)
+      // on the video there are no boxes to grab: every drag starts a new one
+      const handle = gestureOnVideo ? null : hitHandle(ev.clientX, ev.clientY)
       if (handle) {
         const box = pointsFor(name)[selected.index]
         drag = {
@@ -1342,7 +2246,7 @@ function initCanvas() {
         canvas.setPointerCapture(ev.pointerId)
         return
       }
-      const hits = hitBoxAll(ev.clientX, ev.clientY)
+      const hits = gestureOnVideo ? [] : hitBoxAll(ev.clientX, ev.clientY)
       if (hits.length) {
         const alreadySelected =
           selected && selected.name === name && hits.includes(selected.index)
@@ -1359,6 +2263,7 @@ function initCanvas() {
         }
 
         selected = { name, index: boxIndex }
+        freshBox = false
         const box = pointsFor(name)[boxIndex]
         activeLabel = box.label || activeLabel
         const p = toImage(ev.clientX, ev.clientY)
@@ -1448,6 +2353,18 @@ function initCanvas() {
       return
     }
 
+    // drawing must work before any image exists (i.e. while the stage shows the video)
+    if (drag.mode === 'draw') {
+      const p = toImage(ev.clientX, ev.clientY)
+      const size = imageSize()
+      drag.current = {
+        x: clamp(p.x, 0, size.w),
+        y: clamp(p.y, 0, size.h),
+      }
+      drawPreviewBox(drag)
+      return
+    }
+
     const name = images[current].name
 
     if (drag.mode === 'point') {
@@ -1486,15 +2403,6 @@ function initCanvas() {
       return
     }
 
-    if (drag.mode === 'draw') {
-      const p = toImage(ev.clientX, ev.clientY)
-      const img = images[current]
-      drag.current = {
-        x: clamp(p.x, 0, img.width),
-        y: clamp(p.y, 0, img.height),
-      }
-      drawPreviewBox(drag)
-    }
   })
 
   canvas.addEventListener('pointerup', (ev) => {
@@ -1503,49 +2411,44 @@ function initCanvas() {
     drag = null
 
     if (finished.mode === 'pan') {
-      // a click (no drag) on empty space adds a keypoint
-      if (!finished.moved && mode === 'keypoints') {
-        const name = images[current].name
-        const p = toImage(ev.clientX, ev.clientY)
-        if (!insideImage(p)) return
-        if (!stores.keypoints[name]) stores.keypoints[name] = []
-        const list = stores.keypoints[name]
-        list.push({
-          x: clamp(p.x, 0, images[current].width - 1),
-          y: clamp(p.y, 0, images[current].height - 1),
-          label: 'p' + (list.length + 1),
-        })
-        selected = { name, index: list.length - 1 }
-        saveStore('keypoints')
-        updateList()
-        updateCountLabel()
-        draw()
+      // a real click always carries a pixel or two of hand jitter, so judge the
+      // gesture by distance rather than by the 3px "moved" flag
+      const travelled = Math.hypot(ev.clientX - finished.x, ev.clientY - finished.y)
+      const isClick = travelled < 8
+
+      if (isClick && gestureOnVideo) {
+        // clicking the video keeps the frame; in keypoints mode the click is also the first point
+        if (mode === 'keypoints') keepFrameThen(() => addPointAt(ev.clientX, ev.clientY))
+        else markFrame()
+        return
+      }
+      if (isClick && mode === 'keypoints') {
+        addPointAt(ev.clientX, ev.clientY)
       }
       return
     }
 
     if (finished.mode === 'draw') {
-      const image = images[current]
+      const size = imageSize()
       const raw = normalizeRect(finished.start, finished.current)
       const rect = {
-        x: clamp(raw.x, 0, image.width),
-        y: clamp(raw.y, 0, image.height),
+        x: clamp(raw.x, 0, size.w),
+        y: clamp(raw.y, 0, size.h),
         w: 0,
         h: 0,
       }
-      rect.w = Math.min(raw.w, image.width - rect.x)
-      rect.h = Math.min(raw.h, image.height - rect.y)
+      rect.w = Math.min(raw.w, size.w - rect.x)
+      rect.h = Math.min(raw.h, size.h - rect.y)
       draw()
-      if (rect.w < 4 || rect.h < 4) return
-      const name = image.name
-      if (!stores.boxes[name]) stores.boxes[name] = []
-      stores.boxes[name].push({ ...rect, label: activeLabel })
-      selected = { name, index: stores.boxes[name].length - 1 }
-      saveStore('boxes')
-      updateList()
-      updateCountLabel()
-      renderLabelChips()
-      draw()
+      const bigEnough = rect.w >= 4 && rect.h >= 4
+      if (gestureOnVideo) {
+        // the drag itself is the decision to annotate this frame
+        if (bigEnough) keepFrameThen(() => pushBox(rect))
+        else markFrame()
+        return
+      }
+      if (!bigEnough) return
+      pushBox(rect)
       return
     }
 
@@ -1572,6 +2475,7 @@ function initCanvas() {
         activeLabel = box.label || activeLabel
       }
       saveStore('boxes')
+      freshBox = true
       updateList()
       updateCountLabel()
       renderLabelChips()
@@ -1585,11 +2489,13 @@ function initCanvas() {
   canvas.addEventListener('contextmenu', (ev) => {
     ev.preventDefault()
     if (!images.length) return
+    if (previewing) return
 
     if (mode === 'keypoints') {
       const index = hitPoint(ev.clientX, ev.clientY)
       if (index === null) return
-      pointsFor(images[current].name).splice(index, 1)
+      const name = images[current].name
+      pointsFor(name).splice(index, 1)
       selected = null
       saveStore('keypoints')
       updateList()
@@ -1601,7 +2507,8 @@ function initCanvas() {
     if (mode !== 'boxes') return
     const index = hitBox(ev.clientX, ev.clientY)
     if (index === null) return
-    pointsFor(images[current].name).splice(index, 1)
+    const name = images[current].name
+    pointsFor(name).splice(index, 1)
     selected = null
     saveStore('boxes')
     updateList()
@@ -1636,7 +2543,8 @@ function drawPreviewBox(drag) {
 
 function initKeyboard() {
   window.addEventListener('keydown', (ev) => {
-    if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement) return
+    if (ev.target instanceof HTMLTextAreaElement) return
+    if (ev.target instanceof HTMLInputElement && ev.target.type !== 'range') return
 
     if (ev.key === 'Escape') {
       selected = null
@@ -1648,6 +2556,44 @@ function initKeyboard() {
       fitView()
       return
     }
+
+    // video frame picker (only while a video is open)
+    if (videos.length && !$('videopanel').classList.contains('hidden')) {
+      if (ev.key === 'm' || ev.key === 'M') {
+        ev.preventDefault()
+        markFrame()
+        return
+      }
+      if (ev.key === '[') {
+        ev.preventDefault()
+        stepFrame(-1, ev.shiftKey ? 10 : 1)
+        return
+      }
+      if (ev.key === ']') {
+        ev.preventDefault()
+        stepFrame(1, ev.shiftKey ? 10 : 1)
+        return
+      }
+      if (ev.key === ' ') {
+        ev.preventDefault()
+        togglePlay()
+        return
+      }
+      // arrows seek unless a point/box is selected (then they nudge, as before)
+      if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+        const canNudge = !previewing && selected &&
+          selected.name === images[current]?.name && mode !== 'classes' &&
+          !(mode === 'boxes' && freshBox)
+        if (!canNudge) {
+          ev.preventDefault()
+          stepFrame(ev.key === 'ArrowRight' ? 1 : -1, ev.shiftKey ? 10 : 1)
+          return
+        }
+      }
+    }
+
+    // the stage is showing a live video frame, not a dataset item — nothing here is editable
+    if (previewing) return
 
     // 1..9 toggles labels in classes mode, selects in boxes mode
     if (/^[1-9]$/.test(ev.key) && mode !== 'keypoints') {
@@ -1712,23 +2658,35 @@ function initKeyboard() {
 /* --------------------------------------------------------- json panel */
 
 function exportObject(forMode = mode) {
-  const clean = {}
+  const clean = {
+    _meta: { version: 2, tool: 'image-annotator', mode: forMode, coord: 'source-pixels' },
+  }
   if (forMode === 'classes') {
     for (const [name, entry] of Object.entries(stores.classes)) {
       if (entry && Array.isArray(entry.labels) && entry.labels.length) {
         clean[name] = { labels: entry.labels }
       }
     }
-    return clean
+  } else {
+    for (const [name, list] of Object.entries(stores[forMode])) {
+      if (!Array.isArray(list) || !list.length) continue
+      clean[name] = list.map((item) =>
+        forMode === 'boxes'
+          ? { x: item.x, y: item.y, w: item.w, h: item.h, label: item.label }
+          : { x: item.x, y: item.y, label: item.label },
+      )
+    }
   }
-  for (const [name, list] of Object.entries(stores[forMode])) {
-    if (!Array.isArray(list) || !list.length) continue
-    clean[name] = list.map((item) =>
-      forMode === 'boxes'
-        ? { x: item.x, y: item.y, w: item.w, h: item.h, label: item.label }
-        : { x: item.x, y: item.y, label: item.label },
-    )
+
+  // provenance, only for frames captured from a video — plain images stay implicit
+  const provenance = {}
+  for (const name of Object.keys(clean)) {
+    if (name.startsWith('_')) continue
+    const source = sources[name]
+    if (source && source.kind === 'video-frame') provenance[name] = source
   }
+  if (Object.keys(provenance).length) clean._sources = provenance
+
   return clean
 }
 
@@ -1750,11 +2708,15 @@ async function copyJson() {
   }
 }
 
+let flashTimer = 0
+
 function flash(message) {
-  const el = $('count')
-  const previous = el.textContent
+  const el = $('toast')
+  if (!el) return
   el.textContent = message
-  setTimeout(() => { el.textContent = previous }, 1400)
+  el.classList.add('show')
+  clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => el.classList.remove('show'), 1900)
 }
 
 function downloadJson() {
@@ -1764,79 +2726,6 @@ function downloadJson() {
   a.download = `annotations-${mode}.json`
   a.click()
   URL.revokeObjectURL(a.href)
-}
-
-async function importJsonText(text) {
-  let data
-  try {
-    data = JSON.parse(text)
-  } catch {
-    flash('Invalid JSON')
-    return
-  }
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    flash('JSON must be an object keyed by filename')
-    return
-  }
-
-  let imported = 0
-  if (mode === 'classes') {
-    for (const [name, value] of Object.entries(data)) {
-      const labels = (Array.isArray(value) ? value : value?.labels) || []
-      const clean = [...new Set(labels.filter((label) => typeof label === 'string' && label.trim()))]
-      if (!clean.length) continue
-      stores.classes[name] = { labels: clean }
-      imported++
-      for (const label of clean) {
-        if (!labelSet.includes(label)) labelSet.push(label)
-      }
-    }
-    saveLabels()
-    saveStore('classes')
-  } else {
-    const store = stores[mode]
-    for (const [name, list] of Object.entries(data)) {
-      if (!Array.isArray(list)) continue
-      const clean = list
-        .filter((item) => {
-          if (!item || typeof item !== 'object') return false
-          if (!Number.isFinite(Number(item.x)) || !Number.isFinite(Number(item.y))) return false
-          if (mode === 'boxes') {
-            return Number.isFinite(Number(item.w)) && Number.isFinite(Number(item.h))
-          }
-          return true
-        })
-        .map((item, index) => {
-          if (mode === 'boxes') {
-            return {
-              x: Number(item.x), y: Number(item.y),
-              w: Number(item.w), h: Number(item.h),
-              label: String(item.label || ''),
-            }
-          }
-          return {
-            x: Number(item.x), y: Number(item.y),
-            label: String(item.label || 'p' + (index + 1)),
-          }
-        })
-      if (!clean.length) continue
-      store[name] = clean
-      imported++
-      for (const item of clean) {
-        if (item.label && !labelSet.includes(item.label)) labelSet.push(item.label)
-      }
-    }
-    saveLabels()
-    saveStore(mode)
-  }
-
-  updateList()
-  updateCountLabel()
-  renderLabelChips()
-  await render()
-  flash(imported
-    ? `Imported ${imported} image${imported === 1 ? '' : 's'}`
-    : 'No valid annotations found')
 }
 
 /* ------------------------------------------------------------- wiring */
@@ -1864,9 +2753,79 @@ function init() {
     await addFiles(ev.target.files)
     ev.target.value = ''
   }
+  $('videopicker').onchange = async (ev) => {
+    await addFiles(ev.target.files)
+    ev.target.value = ''
+  }
   $('folder').onchange = async (ev) => {
     await addFiles(ev.target.files)
     ev.target.value = ''
+  }
+
+  // ---- video frame picker ----
+  const preview = $('vpreview')
+  preview.addEventListener('timeupdate', () => { if (activeVideo >= 0) syncSlider() })
+  preview.addEventListener('seeked', () => {
+    const video = videos[activeVideo]
+    if (!video) return
+    video.time = preview.currentTime
+    seekShown = null
+    syncSlider()
+    if (seekTarget !== null) {
+      pumpSeek() // still scrubbing: land the newer target next
+      return
+    }
+    if (previewArmed) updatePreview()
+  })
+  preview.addEventListener('play', updateVideoTime)
+  preview.addEventListener('pause', updateVideoTime)
+  preview.addEventListener('error', () => {
+    if (videos.length) flash('This browser cannot play that video')
+  })
+
+  $('vslider').addEventListener('input', () => {
+    if (activeVideo < 0) return
+    previewArmed = true
+    annotateTarget = 'video'
+    seekVideo(Number($('vslider').value) / 1000)
+    const mark = $('vmark')
+    mark.classList.remove('attn')
+    void mark.offsetWidth
+    mark.classList.add('attn')
+  })
+
+  const savedUnit = localStorage.getItem(STEP_UNIT_KEY)
+  const savedValue = Number(localStorage.getItem(STEP_VALUE_KEY))
+  if (savedUnit === 'frame' || savedUnit === 'sec') stepUnit = savedUnit
+  if (Number.isFinite(savedValue) && savedValue > 0) stepValue = savedValue
+  $('vstepunit').value = stepUnit
+  $('vstepvalue').value = String(stepValue)
+  $('vstepunit').onchange = (ev) => {
+    stepUnit = ev.target.value === 'sec' ? 'sec' : 'frame'
+    localStorage.setItem(STEP_UNIT_KEY, stepUnit)
+  }
+  $('vstepvalue').oninput = (ev) => {
+    const value = Number(ev.target.value)
+    if (!Number.isFinite(value) || value <= 0) return
+    stepValue = value
+    localStorage.setItem(STEP_VALUE_KEY, String(stepValue))
+  }
+
+  $('vprev').onclick = () => stepFrame(-1)
+  $('vnext').onclick = () => stepFrame(1)
+  $('vplay').onclick = togglePlay
+  $('vmark').onclick = markFrame
+  $('vfps').onclick = async () => {
+    const video = videos[activeVideo]
+    if (!video) return
+    const fps = await measureFps()
+    flash(fps ? `fps ≈ ${fps} (measured)` : 'Cannot measure fps in this browser')
+  }
+  $('vcollapse').onclick = () => {
+    const panel = $('videopanel')
+    panel.classList.toggle('collapsed')
+    $('vcollapse').textContent = panel.classList.contains('collapsed') ? 'Expand' : 'Collapse'
+    relayout()
   }
 
   const pickJson = () => $('jsonfile').click()
