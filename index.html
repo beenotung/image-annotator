@@ -1214,6 +1214,69 @@ async function addVideo(file) {
   })
   $('videopanel').classList.remove('hidden')
   await selectVideo(videos.length - 1)
+  await restoreMarkedFrames(videos[videos.length - 1])
+}
+
+function hasAnnotation(name) {
+  if ((stores.keypoints[name] || []).length) return true
+  if ((stores.boxes[name] || []).length) return true
+  const entry = stores.classes[name]
+  return !!(entry && Array.isArray(entry.labels) && entry.labels.length)
+}
+
+async function captureBlob(el) {
+  const canvas = document.createElement('canvas')
+  canvas.width = el.videoWidth
+  canvas.height = el.videoHeight
+  canvas.getContext('2d').drawImage(el, 0, 0)
+  return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+}
+
+/**
+ * A video dragged in again brings its annotated frames back: the frames are
+ * re-captured at the stored timestamps and reuse the stored filenames, which is
+ * what re-attaches the annotations that live in localStorage.
+ */
+async function restoreMarkedFrames(video) {
+  const key = videoKey(video)
+  const pending = Object.entries(sources)
+    .filter(([name, source]) =>
+      source && source.kind === 'video-frame' && source.videoKey === key &&
+      hasAnnotation(name) && !images.some((image) => image.name === name))
+    .sort((a, b) => a[1].t - b[1].t)
+  if (!pending.length) return 0
+
+  const el = $('vpreview')
+  const resumeAt = video.time || 0
+  previewArmed = false
+  let done = 0
+  for (const [name, source] of pending) {
+    flash(`Restoring ${done + 1}/${pending.length} …`)
+    el.currentTime = source.t
+    await once(el, 'seeked')
+    if (el.readyState < 2) await waitReady(el, 2, 3000)
+    const blob = await captureBlob(el)
+    if (!blob) continue
+    images.push({
+      name, url: URL.createObjectURL(blob),
+      width: el.videoWidth, height: el.videoHeight, blob,
+    })
+    if (!video.marked.includes(name)) video.marked.push(name)
+    done++
+  }
+  el.currentTime = resumeAt
+  await once(el, 'seeked')
+  updateList()
+  renderVideoTabs()
+  renderVideoTicks()
+  updateJson()
+  if (done) {
+    pendingFit = true
+    current = images.findIndex((image) => image.name === pending[0][0])
+    if (current >= 0) render()
+    flash(`Restored ${done} annotated frame${done === 1 ? '' : 's'}`)
+  }
+  return done
 }
 
 async function selectVideo(index, { preview = true } = {}) {
@@ -2275,6 +2338,9 @@ function updateList() {
     }
     list.append(row)
   })
+
+  // the export is scoped to what is loaded, so it changes when the list changes
+  updateJson()
 }
 
 function updateModeCounts() {
@@ -3129,18 +3195,21 @@ function initKeyboard() {
 
 /* --------------------------------------------------------- json panel */
 
-function exportObject(forMode = mode) {
+function exportObject(forMode = mode, { loadedOnly = false } = {}) {
+  const loaded = new Set(images.map((image) => image.name))
+  const keep = (name) => !loadedOnly || loaded.has(name)
   const clean = {
     _meta: { version: 2, tool: 'image-annotator', mode: forMode, coord: 'source-pixels' },
   }
   if (forMode === 'classes') {
     for (const [name, entry] of Object.entries(stores.classes)) {
-      if (entry && Array.isArray(entry.labels) && entry.labels.length) {
+      if (keep(name) && entry && Array.isArray(entry.labels) && entry.labels.length) {
         clean[name] = { labels: entry.labels }
       }
     }
   } else {
     for (const [name, list] of Object.entries(stores[forMode])) {
+      if (!keep(name)) continue
       if (!Array.isArray(list) || !list.length) continue
       clean[name] = list.map((item) =>
         forMode === 'boxes'
@@ -3165,21 +3234,25 @@ function exportObject(forMode = mode) {
 function updateJson() {
   const el = $('json')
   if (!el) return
-  const data = exportObject()
+  const data = exportObject(mode, { loadedOnly: true })
   el.value = JSON.stringify(data, null, 2)
 
-  // the store is the source of truth: entries can outlive the loaded files
+  // only what is in the list is exported; anything else waits in localStorage
   const names = Object.keys(data).filter((name) => !name.startsWith('_'))
-  const missing = names.filter((name) => !images.some((image) => image.name === name)).length
+  const loaded = new Set(images.map((image) => image.name))
+  const hidden = Object.keys(stores[mode]).filter((name) => !name.startsWith('_') && !loaded.has(name) &&
+    (mode === 'classes'
+      ? (stores.classes[name] && (stores.classes[name].labels || []).length > 0)
+      : (stores[mode][name] || []).length > 0)).length
   const head = $('jsonhead')
   if (head) {
     const base = mode === 'keypoints' ? 'Keypoints JSON' : mode === 'boxes' ? 'Boxes JSON' : 'Classes JSON'
     head.textContent = names.length
-      ? `${base} — ${names.length} item${names.length === 1 ? '' : 's'}${missing ? ` (${missing} not loaded)` : ''}`
-      : base
-    head.title = missing
-      ? `${missing} entr${missing === 1 ? 'y belongs' : 'ies belong'} to images that are not in the list right now; they are kept so re-adding the file restores them`
-      : 'Every entry belongs to an image in the list'
+      ? `${base} — ${names.length} item${names.length === 1 ? '' : 's'}${hidden ? ` · ${hidden} hidden` : ''}`
+      : (hidden ? `${base} — nothing loaded (${hidden} saved)` : base)
+    head.title = hidden
+      ? `${hidden} annotated file${hidden === 1 ? ' is' : 's are'} not in the list, so ${hidden === 1 ? 'it is' : 'they are'} left out of the export; drop the file again to bring ${hidden === 1 ? 'it' : 'them'} back`
+      : 'Every saved entry belongs to a file in the list'
   }
 }
 
@@ -3324,7 +3397,7 @@ async function downloadZip() {
   }
 
   for (const forMode of MODES) {
-    const data = exportObject(forMode)
+    const data = exportObject(forMode, { loadedOnly: true })
     if (Object.keys(data).length <= 1) continue
     files.push({
       name: `annotations-${forMode}.json`,
@@ -3340,7 +3413,7 @@ async function downloadZip() {
     modes: MODES,
     images: names.filter((name) => !missing.includes(name)),
     sources,
-    missing,
+    excluded: Object.keys(sources).filter((name) => missing.includes(name)),
   }
   files.push({ name: '_manifest.json', bytes: encoder.encode(JSON.stringify(manifest, null, 2)) })
 
