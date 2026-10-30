@@ -407,46 +407,50 @@
     border-bottom: 1px solid var(--line);
   }
   #videopanel.hidden { display: none; }
-  .vhead {
+  /* video list */
+  #videolist { flex: 1; overflow: auto; }
+  #videolist.hidden { display: none; }
+  .vitem {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
     border-bottom: 1px solid var(--line);
-    min-height: 36px;
-    overflow-x: auto;
   }
-  .vhead .vtitle {
+  .vitem:hover { background: var(--panel-2); }
+  .vitem.active { box-shadow: inset 3px 0 0 var(--accent); }
+  .vitem .vname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vitem .vcount { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .vitem .vcount.has { color: var(--accent); }
+  .vitem .rm {
+    background: transparent;
+    color: var(--muted);
+    border: 0;
+    padding: 0 4px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 3px;
+    opacity: 0;
+  }
+  .vitem:hover .rm,
+  .vitem .rm:focus { opacity: 1; }
+  .vitem .rm:hover { color: var(--warn); background: var(--danger-bg); }
+  @media (hover: none) { .vitem .rm { opacity: 1; } }
+  .vitem .caret {
+    width: 16px;
     color: var(--muted);
     font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    white-space: nowrap;
-  }
-  #vtabs { display: flex; gap: 6px; }
-  .vtab {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--panel-3);
-    color: var(--muted);
-    border: 1px solid var(--line-2);
-    border-radius: 6px;
-    padding: 3px 9px;
+    line-height: 1;
+    text-align: center;
     cursor: pointer;
-    font: inherit;
-    white-space: nowrap;
+    border-radius: 3px;
   }
-  .vtab:hover { border-color: var(--accent); }
-  .vtab.active {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-color: var(--accent);
-    font-weight: 600;
-  }
-  .vtab .vcount { font-size: 11px; opacity: .8; font-variant-numeric: tabular-nums; }
-  .vtab .vx { opacity: .6; padding: 0 2px; border-radius: 3px; }
-  .vtab .vx:hover { opacity: 1; background: rgba(0, 0, 0, .25); }
+  .vitem .caret:hover { color: var(--fg); background: var(--panel-3); }
+  .vitem.active .caret { color: var(--accent); }
+  .item.child { padding-left: 30px; }
+  .item.child .idx { min-width: 24px; }
+  .item .vb { display: none; }
   #vcollapse { margin-left: auto; padding: 4px 9px; }
 
   #videobody { display: flex; align-items: center; gap: 10px; padding: 6px 12px; }
@@ -518,7 +522,7 @@
 <body>
 
 <aside>
-  <h1>Images <span id="imgcount">(0/0)</span></h1>
+  <h1>Images <span id="imgcount">(0/0)</span> <span id="vidsum"></span></h1>
   <div id="progressbar"><div id="progressfill"></div></div>
   <div id="list"><div class="empty">Drop images here, or use the buttons below.</div></div>
   <div id="boxlist" class="hidden">
@@ -574,11 +578,6 @@
   </div>
 
   <div id="videopanel" class="hidden">
-    <div class="vhead">
-      <span class="vtitle">Video</span>
-      <span id="vtabs"></span>
-      <button id="vcollapse" class="ghost" title="Collapse / expand the frame picker">Collapse</button>
-    </div>
     <div id="videobody">
       <video id="vpreview" muted playsinline></video>
       <div id="vsliderwrap">
@@ -599,6 +598,7 @@
         <span id="vtime">0:00.000</span>
         <span id="vframe" class="muted"></span>
         <span id="vfps" class="muted" title="Click to measure the frame rate — the frame index is only reported when fps is measured">fps –</span>
+        <button id="vcollapse" class="ghost" title="Hide / show the frame picker">Hide</button>
       </div>
     </div>
   </div>
@@ -874,8 +874,7 @@ function reopenKeptFrame(step) {
   pendingFit = true
   render()
   updateList()
-  renderVideoTabs()
-  renderVideoTicks()
+    renderVideoTicks()
 }
 
 function applyHistoryStep(step, direction) {
@@ -1214,6 +1213,7 @@ async function addVideo(file) {
   })
   $('videopanel').classList.remove('hidden')
   await selectVideo(videos.length - 1)
+  updateList()
   await restoreMarkedFrames(videos[videos.length - 1])
 }
 
@@ -1267,8 +1267,7 @@ async function restoreMarkedFrames(video) {
   el.currentTime = resumeAt
   await once(el, 'seeked')
   updateList()
-  renderVideoTabs()
-  renderVideoTicks()
+    renderVideoTicks()
   updateJson()
   if (done) {
     pendingFit = true
@@ -1295,8 +1294,7 @@ async function selectVideo(index, { preview = true } = {}) {
   el.src = video.url
   await waitReady(el, 1)
   el.currentTime = Math.min(Math.max(0, video.time || 0), Math.max(0, (video.duration || 0) - 0.001))
-  renderVideoTabs()
-  renderVideoTicks()
+    renderVideoTicks()
   updateVideoTime()
   syncSlider()
   await waitReady(el, 2)
@@ -1305,38 +1303,22 @@ async function selectVideo(index, { preview = true } = {}) {
   else annotateTarget = 'item'
 }
 
-function renderVideoTabs() {
-  const wrap = $('vtabs')
-  wrap.innerHTML = ''
-
-  videos.forEach((video, index) => {
-    const tab = document.createElement('button')
-    tab.className = 'vtab' + (index === activeVideo ? ' active' : '')
-    tab.title = `${video.name} · ${clock(video.duration)} · ${video.width}×${video.height}`
-
-    const label = document.createElement('span')
-    label.textContent = video.name
-
-    const count = document.createElement('span')
-    count.className = 'vcount'
-    count.textContent = video.marked.length ? `${video.marked.length} marked` : 'none marked'
-
-    const x = document.createElement('span')
-    x.className = 'vx'
-    x.textContent = '×'
-    x.title = 'Close this video (keeps the frames already marked)'
-    x.onclick = (ev) => {
-      ev.stopPropagation()
-      removeVideo(index)
-    }
-
-    tab.append(label, count, x)
-    tab.onclick = () => selectVideo(index)
-    wrap.append(tab)
-  })
+/** step through the dataset list, keeping the video playhead in step */
+function moveSelection(delta) {
+  if (!images.length) return
+  const next = clamp(current + delta, 0, images.length - 1)
+  if (next === current && !previewing) return
+  current = next
+  selected = null
+  pendingFit = true
+  render()
+  updateList()
+  syncVideoToFrame(images[next].name)
+  const row = document.querySelector('.item.active')
+  if (row) row.scrollIntoView({ block: 'nearest' })
 }
 
-/** bring back a closed video from its history step */
+/** move the video playhead (and the slider) onto a kept frame, without previewing it */
 async function reopenVideo(step) {
   const saved = step.video
   const url = URL.createObjectURL(saved.file)
@@ -1385,7 +1367,7 @@ function removeVideo(index, { record = true } = {}) {
     activeVideo = -1
     $('vpreview').removeAttribute('src')
     $('videopanel').classList.add('hidden')
-    renderVideoTabs()
+    updateList()
     renderVideoTicks()
     if (marked) flash(`Closed ${video.name} — ${marked} frame(s) stay in the list`)
     else flash(`Closed ${video.name}`)
@@ -1414,21 +1396,6 @@ function removeVideo(index, { record = true } = {}) {
 }
 
 /** step through the dataset list, keeping the video playhead in step */
-function moveSelection(delta) {
-  if (!images.length) return
-  const next = clamp(current + delta, 0, images.length - 1)
-  if (next === current && !previewing) return
-  current = next
-  selected = null
-  pendingFit = true
-  render()
-  updateList()
-  syncVideoToFrame(images[next].name)
-  const row = document.querySelector('.item.active')
-  if (row) row.scrollIntoView({ block: 'nearest' })
-}
-
-/** move the video playhead (and the slider) onto a kept frame, without previewing it */
 async function syncVideoToFrame(name) {
   const source = sources[name]
   if (!source || source.kind !== 'video-frame') return
@@ -1805,8 +1772,7 @@ async function markFrame() {
   pendingFit = true
   await render()
   updateList()
-  renderVideoTabs()
-  renderVideoTicks()
+    renderVideoTicks()
   flash(`Marked ${name}`)
   return entry
 }
@@ -2269,77 +2235,150 @@ function updateCountLabel(forMode = mode) {
   $('count').textContent = `${n} ${unitLabel(forMode, n)}`
 }
 
+const collapsedVideos = new Set()
+
+function imageRow(index, nested) {
+  const image = images[index]
+  const n = countFor(image.name)
+  const row = document.createElement('div')
+  row.className = 'item' + (nested ? ' child' : '') +
+    (!previewing && index === current ? ' active' : '') + (n ? ' done' : '')
+
+  const idx = document.createElement('span')
+  idx.className = 'idx'
+  idx.textContent = (index + 1) + '.'
+
+  const nm = document.createElement('span')
+  nm.className = 'nm'
+  nm.textContent = image.name
+
+  const source = sources[image.name]
+  const cnt = document.createElement('span')
+  cnt.className = 'cnt' + (n ? ' has' : '')
+  cnt.textContent = String(n)
+
+  const rm = document.createElement('button')
+  rm.className = 'rm'
+  rm.textContent = '×'
+  rm.title = 'Remove from list (annotations are kept)'
+  rm.onclick = (ev) => {
+    ev.stopPropagation()
+    removeImage(index)
+  }
+
+  row.append(idx, nm, cnt, rm)
+  row.title = source && source.kind === 'video-frame'
+    ? `${image.name}\n${source.video} @ ${clock(source.t)}${source.frame === null ? '' : ` · frame ${source.frame}`}`
+    : image.name
+  row.onclick = () => {
+    current = index
+    selected = null
+    pendingFit = true
+    render()
+    syncVideoToFrame(image.name)
+  }
+  return row
+}
+
+function videoRow(video, indices) {
+  const key = videoKey(video)
+  const collapsed = collapsedVideos.has(key)
+  const row = document.createElement('div')
+  row.className = 'vitem' + (videos[activeVideo] === video ? ' active' : '')
+
+  const caret = document.createElement('span')
+  caret.className = 'caret'
+  caret.textContent = collapsed ? '▸' : '▾'
+  caret.title = collapsed ? 'Show these frames' : 'Hide these frames'
+  caret.onclick = (ev) => {
+    ev.stopPropagation()
+    if (collapsedVideos.has(key)) collapsedVideos.delete(key)
+    else collapsedVideos.add(key)
+    updateList()
+  }
+
+  const name = document.createElement('span')
+  name.className = 'vname'
+  name.textContent = video.name
+
+  const marked = document.createElement('span')
+  marked.className = 'vcount' + (indices.length ? ' has' : '')
+  marked.textContent = String(indices.length)
+
+  const rm = document.createElement('button')
+  rm.className = 'rm'
+  rm.textContent = '×'
+  rm.title = 'Close this video (marked frames stay in the list)'
+  rm.onclick = (ev) => {
+    ev.stopPropagation()
+    removeVideo(videos.indexOf(video))
+  }
+
+  row.append(caret, name, marked, rm)
+  row.title = `${video.name} · ${clock(video.duration)} — click to activate and fold / unfold its frames`
+  row.onclick = () => {
+    if (collapsedVideos.has(key)) collapsedVideos.delete(key)
+    else collapsedVideos.add(key)
+    updateList() // fold immediately, don't wait for the video to (re)load
+    selectVideo(videos.indexOf(video))
+  }
+  return row
+}
+
 function updateList() {
   const list = $('list')
   list.innerHTML = ''
 
-  const total = images.length
-  const done = images.filter((image) => countFor(image.name) > 0).length
-  $('imgcount').textContent = `(${done}/${total})`
-  $('progressfill').style.width = total ? `${(done / total) * 100}%` : '0%'
+  const doneAll = images.filter((image) => countFor(image.name) > 0).length
+  $('imgcount').textContent = `(${doneAll}/${images.length})`
+  const vidsum = $('vidsum')
+  if (vidsum) {
+    vidsum.textContent = videos.length ? `· ${videos.length} video${videos.length === 1 ? '' : 's'}` : ''
+    vidsum.title = videos.length
+      ? 'videos are shown as group headers; only their frames are counted as images'
+      : ''
+  }
+  $('progressfill').style.width = images.length
+    ? `${(doneAll / images.length) * 100}%`
+    : '0%'
+
   updateModeCounts()
   updateBoxList()
   renderVideoTicks()
 
-  if (!images.length) {
+  if (!images.length && !videos.length) {
     const empty = document.createElement('div')
     empty.className = 'empty'
     empty.textContent = 'Drop images, a video, a ZIP or a folder here, or use the buttons below.'
     list.append(empty)
+    updateJson()
     return
   }
 
+  // frames sit under the video they came from; plain images are top level
+  const claimed = new Set()
+  for (const video of videos) {
+    const key = videoKey(video)
+    const indices = []
+    images.forEach((image, index) => {
+      const source = sources[image.name]
+      if (source && source.kind === 'video-frame' && source.videoKey === key) {
+        indices.push(index)
+        claimed.add(index)
+      }
+    })
+    list.append(videoRow(video, indices))
+    if (!collapsedVideos.has(key)) {
+      for (const index of indices) list.append(imageRow(index, true))
+    }
+  }
   images.forEach((image, index) => {
-    const n = countFor(image.name)
-    const row = document.createElement('div')
-    row.className = 'item' + (!previewing && index === current ? ' active' : '') + (n ? ' done' : '')
-
-    const idx = document.createElement('span')
-    idx.className = 'idx'
-    idx.textContent = (index + 1) + '.'
-
-    const nm = document.createElement('span')
-    nm.className = 'nm'
-    nm.textContent = image.name
-
-    const source = sources[image.name]
-    const vb = source && source.kind === 'video-frame' ? document.createElement('span') : null
-    if (vb) {
-      vb.className = 'vb'
-      vb.textContent = 'vid'
-      vb.title = `${source.video} @ ${clock(source.t)}${source.frame === null ? '' : ` · frame ${source.frame}`}`
-    }
-
-    const cnt = document.createElement('span')
-    cnt.className = 'cnt' + (n ? ' has' : '')
-    cnt.textContent = String(n)
-
-    const rm = document.createElement('button')
-    rm.className = 'rm'
-    rm.textContent = '×'
-    rm.title = 'Remove from list (annotations are kept)'
-    rm.onclick = (ev) => {
-      ev.stopPropagation()
-      removeImage(index)
-    }
-
-    row.append(idx, nm)
-    if (vb) row.append(vb)
-    row.append(cnt, rm)
-    row.title = source && source.kind === 'video-frame'
-      ? `${image.name}\n${source.video} @ ${clock(source.t)}${source.frame === null ? '' : ` · frame ${source.frame}`}`
-      : image.name
-    row.onclick = () => {
-      current = index
-      selected = null
-      pendingFit = true
-      render()
-      syncVideoToFrame(image.name)
-    }
-    list.append(row)
+    if (!claimed.has(index)) list.append(imageRow(index, false))
   })
 
-  // the export is scoped to what is loaded, so it changes when the list changes
+  const active = list.querySelector('.item.active')
+  if (active) active.scrollIntoView({ block: 'nearest' })
+
   updateJson()
 }
 
@@ -2443,8 +2482,7 @@ function removeImage(index) {
       const at = video.marked.indexOf(image.name)
       if (at !== -1) video.marked.splice(at, 1)
     }
-    renderVideoTabs()
-    renderVideoTicks()
+        renderVideoTicks()
   }
 
   URL.revokeObjectURL(image.url)
@@ -3535,6 +3573,7 @@ function init() {
   for (const btn of document.querySelectorAll('#modes button')) {
     btn.onclick = () => setMode(btn.dataset.mode)
   }
+
 
   $('picker').onchange = async (ev) => {
     await addFiles(ev.target.files)
